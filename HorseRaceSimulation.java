@@ -61,7 +61,6 @@ class Horse
         if(newConfidence >= 0 && newConfidence <=1)
         {
             this.horseConfidence = newConfidence;
-
         }
         else
         {
@@ -74,3 +73,23 @@ class Horse
         this.horseSymbol = newSymbol;
     }
 }
+
+class Main
+{
+    public static void main(String[] args)
+    {
+        Horse horse_1 = new Horse('#', "Bob", 0.5);
+        System.out.println(horse_1.getName());
+        System.out.println(horse_1.getSymbol());
+        System.out.println(horse_1.getDistanceTravelled());
+        System.out.println(horse_1.hasFallen());
+        horse_1.moveForward();
+        horse_1.moveForward();
+        System.out.println(horse_1.getDistanceTravelled());
+        horse_1.goBackToStart();
+        System.out.println(horse_1.getDistanceTravelled());
+        horse_1.setConfidence(1.5);
+    }
+}
+
+
