@@ -6,6 +6,50 @@
  */
 
 import java.util.concurrent.TimeUnit;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+class StartRaceGUI extends JFrame 
+{
+    private JPanel customisingPanel;
+    private JTextField trackLength;
+    private JButton startRaceButton;
+
+    public StartRaceGUI()
+    {
+        setTitle("Horse Race Simulation");
+        setSize(800,600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+
+        //Costumising panel
+        customisingPanel = new JPanel();
+        customisingPanel.setLayout(new GridLayout(5,2));
+        add(customisingPanel, BorderLayout.NORTH);
+
+        //Choosing Track Length
+        customisingPanel.add(new JLabel("Track Length (metres)"));
+        trackLength = new JTextField("100"); //making a defult value of 100m
+        customisingPanel.add(trackLength);
+
+        //Start Button
+        startRaceButton = new JButton("Start Race");
+        startRaceButton.addActionListener(new StartRaceButtonListener());
+        customisingPanel.add(startRaceButton);
+    }
+
+     // Action Listener for "Start Race" button
+     private class StartRaceButtonListener implements ActionListener 
+     {
+        @Override
+        public void actionPerformed(ActionEvent e) 
+        {
+            int trackLengthInteger = Integer.parseInt(trackLength.getText()); // Get the user input values
+        }
+    }
+}
 
 class Horse
 {
@@ -15,7 +59,7 @@ class Horse
     private boolean hasFallen;
     private double horseConfidence;
 
-    public Horse(char horseSymbol, String horseName, double horseConfidence)
+    public Horse(char horseSymbol, String horseName, double horseConfidence) //constructor
     {
         this.horseName = horseName;
         this.horseSymbol = horseSymbol;
@@ -314,6 +358,9 @@ class HorseRaceSimulation
 {
     public static void main(String[] args) 
     {   
+        StartRaceGUI newRace = new StartRaceGUI();
+        newRace.setVisible(true);
+
         Race race = new Race(10);
         race.addHorse(new Horse('#', "Bob", 0.2), 1);
         race.addHorse(new Horse('I', "Jeff", 0.5), 2);
