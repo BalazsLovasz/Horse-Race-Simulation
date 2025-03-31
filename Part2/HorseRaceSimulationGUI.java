@@ -361,7 +361,7 @@ class HorseRaceSimulation
         StartRaceGUI newRace = new StartRaceGUI();
         newRace.setVisible(true);
 
-        Race race = new Race(10);
+        Race race = new Race(20);
         race.addHorse(new Horse('#', "Bob", 0.2), 1);
         race.addHorse(new Horse('I', "Jeff", 0.5), 2);
         race.addHorse(new Horse('O', "Chad", 0.8), 3);
