@@ -5,11 +5,11 @@
  * @version 1
  */
 
-import java.util.concurrent.TimeUnit;
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.concurrent.TimeUnit;
+import javax.swing.*;
 
 class StartRaceGUI extends JFrame 
 {
@@ -47,6 +47,12 @@ class StartRaceGUI extends JFrame
         public void actionPerformed(ActionEvent e) 
         {
             int trackLengthInteger = Integer.parseInt(trackLength.getText()); // Get the user input values
+
+            Race race = new Race(trackLengthInteger);
+            race.addHorse(new Horse('#', "Bob", 0.2), 1);
+            race.addHorse(new Horse('I', "Jeff", 0.5), 2);
+            race.addHorse(new Horse('O', "Chad", 0.8), 3);
+            new Thread(() -> race.startRace()).start();
         }
     }
 }
@@ -354,18 +360,12 @@ class Race
     }
 }
 
-class HorseRaceSimulation
+class HorseRaceSimulationGUI
 {
     public static void main(String[] args) 
     {   
         StartRaceGUI newRace = new StartRaceGUI();
         newRace.setVisible(true);
-
-        Race race = new Race(20);
-        race.addHorse(new Horse('#', "Bob", 0.2), 1);
-        race.addHorse(new Horse('I', "Jeff", 0.5), 2);
-        race.addHorse(new Horse('O', "Chad", 0.8), 3);
-        race.startRace();  // This ensures `main` exists
     }
 }
 
