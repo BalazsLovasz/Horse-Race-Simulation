@@ -15,6 +15,7 @@ class StartRaceGUI extends JFrame
 {
     private JPanel customisingPanel;
     private JPanel startButtonPanel;
+    private JPanel raceDisplayPanel;
     private JTextField trackLength;
     private JButton startRaceButton;
     private JComboBox<String> laneCountList;
@@ -23,6 +24,7 @@ class StartRaceGUI extends JFrame
 
     public StartRaceGUI()
     {
+        //setting up the window
         setTitle("Horse Race Simulation");
         setSize(800,600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -31,7 +33,13 @@ class StartRaceGUI extends JFrame
         //Panel for the start button
         startButtonPanel = new JPanel();
         startButtonPanel.setLayout(new BorderLayout());
-        add(startButtonPanel, BorderLayout.SOUTH);
+        add(startButtonPanel, BorderLayout.CENTER);
+
+        //This panel will display the race
+        raceDisplayPanel = new JPanel();
+        raceDisplayPanel.setBackground(Color.LIGHT_GRAY);
+        raceDisplayPanel.setPreferredSize(new Dimension(800,400));
+        add(raceDisplayPanel, BorderLayout.SOUTH);
 
         //Custumising panel
         customisingPanel = new JPanel();
