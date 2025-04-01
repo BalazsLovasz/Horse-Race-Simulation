@@ -14,8 +14,12 @@ import javax.swing.*;
 class StartRaceGUI extends JFrame 
 {
     private JPanel customisingPanel;
+    private JPanel startButtonPanel;
     private JTextField trackLength;
     private JButton startRaceButton;
+    private JComboBox<String> laneCountList;
+    private JComboBox<String> weatherCondition;
+    private JComboBox<String> trackShape;
 
     public StartRaceGUI()
     {
@@ -24,20 +28,41 @@ class StartRaceGUI extends JFrame
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        //Costumising panel
+        //Panel for the start button
+        startButtonPanel = new JPanel();
+        startButtonPanel.setLayout(new BorderLayout());
+        add(startButtonPanel, BorderLayout.SOUTH);
+
+        //Custumising panel
         customisingPanel = new JPanel();
         customisingPanel.setLayout(new GridLayout(5,2));
         add(customisingPanel, BorderLayout.NORTH);
 
         //Choosing Track Length
-        customisingPanel.add(new JLabel("Track Length (metres)"));
-        trackLength = new JTextField("100"); //making a defult value of 100m
+        customisingPanel.add(new JLabel("Track Length (metres):"));
+        trackLength = new JTextField("100"); //making a default value of 100m
         customisingPanel.add(trackLength);
+
+        //Choosing the number of lanes
+        customisingPanel.add(new JLabel("Number of Lanes:"));
+        laneCountList = new JComboBox<String>(new String[]{"2","3","4","5"});
+        customisingPanel.add(laneCountList);
+
+        //Choosing the weather
+        customisingPanel.add(new JLabel("Weather Condition:"));
+        weatherCondition = new JComboBox<String>(new String[]{"Dry","Muddy","Icy"});
+        customisingPanel.add(weatherCondition);
+
+        //Choosing the track shape
+        customisingPanel.add(new JLabel("Track Shape:"));
+        trackShape = new JComboBox<String>(new String[]{"Oval","Figure-Eight","Custom"});
+        customisingPanel.add(trackShape);
 
         //Start Button
         startRaceButton = new JButton("Start Race");
         startRaceButton.addActionListener(new StartRaceButtonListener());
-        customisingPanel.add(startRaceButton);
+        startButtonPanel.add(startRaceButton);
+
     }
 
      // Action Listener for "Start Race" button
@@ -47,6 +72,9 @@ class StartRaceGUI extends JFrame
         public void actionPerformed(ActionEvent e) 
         {
             int trackLengthInteger = Integer.parseInt(trackLength.getText()); // Get the user input values
+            int numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem()); // Get the user input values
+            String weatherConditionString =(String) weatherCondition.getSelectedItem(); // Get the user input values
+            String trackShapeString = (String) trackShape.getSelectedItem(); // Get the user input values
 
             Race race = new Race(trackLengthInteger);
             race.addHorse(new Horse('#', "Bob", 0.2), 1);
