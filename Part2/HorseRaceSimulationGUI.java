@@ -13,9 +13,7 @@ import javax.swing.*;
 
 class StartRaceGUI extends JFrame 
 {
-    private JPanel customisingPanel;
-    private JPanel startButtonPanel;
-    private JPanel raceDisplayPanel;
+    private JPanel customisingPanel, startButtonPanel, raceDisplayPanel, mainPanel;
     private JTextField trackLength;
     private JButton startRaceButton;
     private JComboBox<String> laneCountList;
@@ -30,16 +28,20 @@ class StartRaceGUI extends JFrame
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        //Panel for the start button
-        startButtonPanel = new JPanel();
-        startButtonPanel.setLayout(new BorderLayout());
-        add(startButtonPanel, BorderLayout.CENTER);
+        //this panel will have the race running and the button (helps with display)
+        // to wrap button and race panel
+        mainPanel = new JPanel(new BorderLayout());
+        add(mainPanel, BorderLayout.CENTER);
 
         //This panel will display the race
         raceDisplayPanel = new JPanel();
         raceDisplayPanel.setBackground(Color.LIGHT_GRAY);
-        raceDisplayPanel.setPreferredSize(new Dimension(800,400));
-        add(raceDisplayPanel, BorderLayout.SOUTH);
+        mainPanel.add(raceDisplayPanel, BorderLayout.CENTER);
+
+        //Panel for the start button
+        startButtonPanel = new JPanel();
+        startButtonPanel.setLayout(new BorderLayout());
+        mainPanel.add(startButtonPanel, BorderLayout.NORTH);
 
         //Custumising panel
         customisingPanel = new JPanel();
@@ -69,7 +71,18 @@ class StartRaceGUI extends JFrame
         //Start Button
         startRaceButton = new JButton("Start Race");
         startRaceButton.addActionListener(new StartRaceButtonListener());
+        startRaceButton.setFont(new Font("Arial", Font.BOLD, 16));
+        startRaceButton.setBackground(new Color(50, 150, 250)); // sets color to light blue
+        startRaceButton.setForeground(Color.WHITE);
         startButtonPanel.add(startRaceButton);
+
+        Font labelFont = new Font("Arial", Font.PLAIN, 14);
+        Component[] components = customisingPanel.getComponents();
+        for (int i = 0; i < components.length; i++) {
+            if (components[i] instanceof JLabel) {
+                components[i].setFont(labelFont); // sets the font to all JLabels
+            }
+        }
 
     }
 
@@ -95,6 +108,7 @@ class StartRaceGUI extends JFrame
 
 class Horse
 {
+    //instance variable set to private to improve security
     private String horseName;
     private char horseSymbol;
     private int horseDistance;
@@ -110,48 +124,48 @@ class Horse
         this.horseDistance = 0;
     }
 
-    public void fall()
+    public void fall() //method that sets horse to fallen
     {
         this.hasFallen = true;
     }
 
-    public double getConfidence()
+    public double getConfidence() //returns the confidence of the horse
     {
         return this.horseConfidence;
     }
 
-    public int getDistanceTravelled()
+    public int getDistanceTravelled() //returns the distance travelled by the horse
     {
         return this.horseDistance;
     }
 
-    public String getName()
+    public String getName() //returns the name of the horse
     {
         return this.horseName;
     }
 
-    public char getSymbol()
+    public char getSymbol() //returns the symbol of the horse
     {
         return this.horseSymbol;
     }
 
-    public void goBackToStart()
+    public void goBackToStart() //set the horses back to the start line
     {
         this.horseDistance = 0;
         this.hasFallen = false;
     }
 
-    public boolean hasFallen()
+    public boolean hasFallen()// returns wether the horse has fallen or not
     {
        return this.hasFallen;
     }
 
-    public void moveForward()
+    public void moveForward() //moves the horse forward by 1 index;
     {
         this.horseDistance++;
     }
     
-    public void setConfidence(double newConfidence)
+    public void setConfidence(double newConfidence) //asigns a new confident to the horse
     {
         if(newConfidence >= 0 && newConfidence <=1)
         {
@@ -159,7 +173,7 @@ class Horse
         }
         else
         {
-            throw new IllegalArgumentException("Confidence must be between 0 and 1");
+            throw new IllegalArgumentException("Confidence must be between 0 and 1"); //incase the inputed confidence is out of bounds
         }
     }
 
@@ -398,13 +412,9 @@ class Race
 
 class HorseRaceSimulationGUI
 {
-    public static void main(String[] args) 
+    public static void main(String[] args) //main method
     {   
         StartRaceGUI newRace = new StartRaceGUI();
         newRace.setVisible(true);
     }
 }
-
-
-
-
