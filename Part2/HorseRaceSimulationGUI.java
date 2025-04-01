@@ -92,7 +92,21 @@ class StartRaceGUI extends JFrame
         @Override
         public void actionPerformed(ActionEvent e) 
         {
-            int trackLengthInteger = Integer.parseInt(trackLength.getText()); // Get the user input values
+            int trackLengthInteger = 0;
+            try
+            {
+                trackLengthInteger = Integer.parseInt(trackLength.getText()); // Get the user input values
+                if (trackLengthInteger <= 0) 
+                {
+                    JOptionPane.showMessageDialog(null, "Track length must be positive!", "Error", JOptionPane.ERROR_MESSAGE); //displays error message
+                    return;
+                }
+            }
+            catch (NumberFormatException ee) 
+            {
+                JOptionPane.showMessageDialog(null, "Please enter a valid number!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             int numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem()); // Get the user input values
             String weatherConditionString =(String) weatherCondition.getSelectedItem(); // Get the user input values
             String trackShapeString = (String) trackShape.getSelectedItem(); // Get the user input values
