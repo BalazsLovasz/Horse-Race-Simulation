@@ -10,6 +10,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.concurrent.TimeUnit;
 import javax.swing.*;
+import java.util.ArrayList;
 
 class StartRaceGUI extends JFrame 
 {
@@ -19,6 +20,9 @@ class StartRaceGUI extends JFrame
     private JComboBox<String> laneCountList;
     private JComboBox<String> weatherCondition;
     private JComboBox<String> trackShape;
+
+    private JTextField[] horseNames = new JTextField[5];
+    private JTextField[] horseSymbols = new JTextField[5];
 
     public StartRaceGUI()
     {
@@ -45,7 +49,7 @@ class StartRaceGUI extends JFrame
 
         //Custumising panel
         customisingPanel = new JPanel();
-        customisingPanel.setLayout(new GridLayout(5,2));
+        customisingPanel.setLayout(new GridLayout(5,2,10,10));
         add(customisingPanel, BorderLayout.NORTH);
 
         //Choosing Track Length
@@ -78,10 +82,23 @@ class StartRaceGUI extends JFrame
 
         Font labelFont = new Font("Arial", Font.PLAIN, 14);
         Component[] components = customisingPanel.getComponents();
-        for (int i = 0; i < components.length; i++) {
+        for (int i = 0; i < components.length; i++) 
+        {
             if (components[i] instanceof JLabel) {
                 components[i].setFont(labelFont); // sets the font to all JLabels
             }
+        }
+
+        // Horse Inputs (5 Max)
+        for (int i = 0; i < 5; i++) 
+        {
+            customisingPanel.add(new JLabel("Horse " + (i + 1) + " Name:"));
+            horseNames[i] = new JTextField("Horse" + (i + 1));
+            customisingPanel.add(horseNames[i]);
+
+            customisingPanel.add(new JLabel("Horse " + (i + 1) + " Symbol:"));
+            horseSymbols[i] = new JTextField("#");
+            customisingPanel.add(horseSymbols[i]);
         }
 
     }
@@ -111,10 +128,19 @@ class StartRaceGUI extends JFrame
             String weatherConditionString =(String) weatherCondition.getSelectedItem(); // Get the user input values
             String trackShapeString = (String) trackShape.getSelectedItem(); // Get the user input values
 
-            Race race = new Race(trackLengthInteger);
+            Race race = new Race(trackLengthInteger, numberOfLanes, weatherConditionString, trackShapeString);
             race.addHorse(new Horse('#', "Bob", 0.2), 1);
             race.addHorse(new Horse('I', "Jeff", 0.5), 2);
             race.addHorse(new Horse('O', "Chad", 0.8), 3);
+
+            // Adding horses based on selected number of lanes
+            for (int i = 0; i < numberOfLanes; i++) 
+            {
+                String horseName = horseNames[i].getText();
+                char horseSymbol = horseSymbols[i].getText().charAt(0);
+                double confidence = Math.random(); // Assign random confidence
+                race.addHorse(new Horse(horseSymbol, horseName, confidence), i + 1);
+            }
             new Thread(() -> race.startRace()).start();
         }
     }
@@ -206,24 +232,36 @@ class Horse
  */
 class Race
 {
-    private int raceLength;
+    private int trackLength;
+    private int laneCount;
+    private String trackShape;
+    private String weatherCondition;
     private Horse lane1Horse;
     private Horse lane2Horse;
     private Horse lane3Horse;
+    private Horse lane4Horse;
+    private Horse lane5Horse;
+    private static ArrayList<Horse> numberOfHorses = new ArrayList<Horse>();
 
     /**
      * Constructor for objects of class Race
      * Initially there are no horses in the lanes
      * 
-     * @param distance the length of the racetrack (in metres/yards...)
+     * @param trackLength the length of the racetrack (in metres...)
      */
-    public Race(int distance)
+    public Race(int trackLength, int laneCount, String trackShape, String weatherCondition)
     {
         // initialise instance variables
-        raceLength = distance;
+        this.trackLength = trackLength;
+        this.laneCount = laneCount;
+        this.trackShape = trackShape;
+        this.weatherCondition = weatherCondition;
         lane1Horse = null;
         lane2Horse = null;
         lane3Horse = null;
+        lane4Horse = null;
+        lane5Horse = null;
+
     }
     
     /**
@@ -246,10 +284,20 @@ class Race
         {
             lane3Horse = theHorse;
         }
+        else if (laneNumber == 4)
+        {
+            lane4Horse = theHorse;
+        }
+        else if (laneNumber == 5)
+        {
+            lane5Horse = theHorse;
+        }
         else
         {
             System.out.println("Cannot add horse to lane " + laneNumber + " because there is no such lane");
+            return;
         }
+        numberOfHorses.add(theHorse);
     }
     
     /**
@@ -271,20 +319,21 @@ class Race
                       
         while (!finished)
         {
-            //move each horse
-            moveHorse(lane1Horse);
-            moveHorse(lane2Horse);
-            moveHorse(lane3Horse);
+            //move each horse back to start
+            for(int i = 0; i<laneCount; i++)
+            {
+                numberOfHorses.get(i).goBackToStart();
+            }
                         
             //print the race positions
             printRace();
             
             //if any of the three horses has won the race is finished
-            if ( raceWonBy(lane1Horse) || raceWonBy(lane2Horse) || raceWonBy(lane3Horse) )
+            if ( raceWonBy(lane1Horse) || raceWonBy(lane2Horse) || raceWonBy(lane3Horse) || raceWonBy(lane4Horse) || raceWonBy(lane5Horse))
             {
                 finished = true;
             }
-            if (lane1Horse.hasFallen() && lane2Horse.hasFallen() && lane3Horse.hasFallen()) 
+            if (lane1Horse.hasFallen() && lane2Horse.hasFallen() && lane3Horse.hasFallen() && lane4Horse.hasFallen() && lane5Horse.hasFallen()) 
             {
                 System.out.println("All horses have fallen! The race is canceled.");
                 finished = true;
@@ -334,7 +383,7 @@ class Race
      */
     private boolean raceWonBy(Horse theHorse)
     {
-        if (theHorse.getDistanceTravelled() >= raceLength)
+        if (theHorse.getDistanceTravelled() >= trackLength)
         {
             System.err.println("And the winner is... " + theHorse.getName());
             return true;
@@ -353,19 +402,16 @@ class Race
         System.out.print("\033[H\033[2J");
         System.out.flush();
 
-        multiplePrint('=',raceLength+3); //top edge of track
+        multiplePrint('=',trackLength+3); //top edge of track
         System.out.println();
         
-        printLane(lane1Horse);
-        System.out.println();
+        for(int i = 0; i<numberOfHorses.size(); i++)
+        {
+            printLane(numberOfHorses.get(i));
+            System.out.println();
+        }
         
-        printLane(lane2Horse);
-        System.out.println();
-        
-        printLane(lane3Horse);
-        System.out.println();
-        
-        multiplePrint('=',raceLength+3); //bottom edge of track
+        multiplePrint('=',trackLength+3); //bottom edge of track
         System.out.println();    
     }
     
@@ -380,7 +426,7 @@ class Race
         //calculate how many spaces are needed before
         //and after the horse
         int spacesBefore = theHorse.getDistanceTravelled();
-        int spacesAfter = raceLength - theHorse.getDistanceTravelled();
+        int spacesAfter = trackLength - theHorse.getDistanceTravelled();
         
         //print a | for the beginning of the lane
         System.out.print('|');
