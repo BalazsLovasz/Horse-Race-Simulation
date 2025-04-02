@@ -187,7 +187,10 @@ class StartRaceGUI extends JFrame
                 }
                 horses[i] = new Horse(horseSymbol, horseName, confidence);
             }
-            
+            //hide the customising panles
+            horsePanel.setVisible(false);
+            customisingPanel.setVisible(false);
+
             // this create the graphical track panel
             RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackShapeString, numberOfLanes);
 
