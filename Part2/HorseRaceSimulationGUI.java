@@ -123,6 +123,19 @@ class StartRaceGUI extends JFrame
         //refreshes the panel
         horsePanel.revalidate();
         horsePanel.repaint();
+
+        String trackShapeString = (String) trackShape.getSelectedItem(); //Get the user input values
+        int numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem()); // Get the user input values
+
+        RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackShapeString, numberOfLanes);  // Create a new race track panel
+
+        // Remove the old race track panel and add the new one
+        raceDisplayPanel.removeAll();
+        raceDisplayPanel.add(raceTrackPanel, BorderLayout.CENTER);  // Adds the new track panel
+
+        // Refresh the race display panel
+        raceDisplayPanel.revalidate();
+        raceDisplayPanel.repaint();
     }
 
     // Action Listener for "Start Race" button
@@ -174,8 +187,9 @@ class StartRaceGUI extends JFrame
                 }
                 horses[i] = new Horse(horseSymbol, horseName, confidence);
             }
+            
             // this create the graphical track panel
-            RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackShapeString);
+            RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackShapeString, numberOfLanes);
 
             // this updates the race display panel
             mainPanel.removeAll();  // Removes anything that was previously there
@@ -184,7 +198,6 @@ class StartRaceGUI extends JFrame
             // Refresh the race display panel
             mainPanel.revalidate();
             mainPanel.repaint();
-
         }
     }
 }
@@ -192,10 +205,12 @@ class StartRaceGUI extends JFrame
 class RaceTrackPanel extends JPanel 
 {
     private String trackShape;
+    private int laneCount;
 
-    public RaceTrackPanel(String trackShape) 
+    public RaceTrackPanel(String trackShape, int laneCount) 
     {
         this.trackShape = trackShape;
+        this.laneCount = laneCount;
     }
 
     @Override
@@ -206,22 +221,28 @@ class RaceTrackPanel extends JPanel
         int width = getWidth();   // Panel width
         int height = getHeight(); // Panel height
 
-        g.setColor(Color.BLACK); // Track color
+        g.setColor(Color.BLACK); 
 
         if (trackShape.equals("Oval")) 
         {
-            // Draw an oval track
-            g.drawOval(50, 50, width - 100, height - 100);
-            g.drawOval(100, 100, width - 200, height - 200);
+            // Calculate dimensions dynamically
+            int ovalWidth = width - 200;  // Base oval width
+            int ovalHeight = height - 100;  // Base oval height
+            int offsetX = 50;  // Offset from left
+            int offsetY = 50;  // Offset from top
 
+            // Draw the outer and inner ovals based on lane count
+            for (int i = 0; i < laneCount; i++) 
+            {
+                int offset = i * 40;  // Space between each lane
+                g.drawOval(offsetX + offset, offsetY + offset, ovalWidth - (offset * 2), ovalHeight - (offset * 2));
+            }
         } 
         else if (trackShape.equals("Figure-Eight")) 
         {
             // Draw two connected loops for figure-eight
-            g.drawOval(50, 50, (width / 2) - 60, height - 100);
-            g.drawOval((width / 2) + 10, 50, (width / 2) - 60, height - 100);
-            g.drawLine(width / 2, 50, width / 2, height - 50); // Middle crossing
-
+            g.drawOval(50, 50, (width / 2)-50, height - 100);
+            g.drawOval((width / 2), 50, (width / 2)-50, height - 100);
         }
         else if (trackShape.equals("Straight")) 
         {
@@ -234,6 +255,7 @@ class RaceTrackPanel extends JPanel
         }
     }
 }
+
 
 class Horse
 {
