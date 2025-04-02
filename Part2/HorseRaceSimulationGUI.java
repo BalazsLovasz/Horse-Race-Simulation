@@ -23,6 +23,7 @@ class StartRaceGUI extends JFrame
 
     private JTextField[] horseNames = new JTextField[5];
     private JTextField[] horseSymbols = new JTextField[5];
+    private JTextField[] horseConfidences = new JTextField[5];
 
     public StartRaceGUI()
     {
@@ -64,8 +65,7 @@ class StartRaceGUI extends JFrame
 
         // Horse Input Panel (Initially Empty)
         horsePanel = new JPanel(new GridLayout(0, 2, 10, 10));
-        add(horsePanel, BorderLayout.SOUTH);
- 
+        add(horsePanel, BorderLayout.SOUTH); 
 
         // Listener to update horse inputs dynamically
         laneCountList.addActionListener(e -> updateHorseInputs());
@@ -88,9 +88,10 @@ class StartRaceGUI extends JFrame
         startRaceButton.setForeground(Color.WHITE);
         startButtonPanel.add(startRaceButton);
 
+        //setting the font for every text
         Font labelFont = new Font("Arial", Font.PLAIN, 14);
         Component[] components = customisingPanel.getComponents();
-        for (int i = 0; i < components.length; i++) 
+        for (int i = 0; i < components.length; i++) //loops through all JLabel components
         {
             if (components[i] instanceof JLabel) 
             {
@@ -105,17 +106,23 @@ class StartRaceGUI extends JFrame
         horsePanel.removeAll();
         int numLanes = Integer.parseInt((String) laneCountList.getSelectedItem());
 
+        //adds the JTextFields to the horse panel
         for (int i = 0; i < numLanes; i++) 
         {
-            horsePanel.add(new JLabel("Horse " + (i + 1) + " Name:"));
+            horsePanel.add(new JLabel("Horse " + (i + 1) + " Name:")); //name
             horseNames[i] = new JTextField("Horse" + (i + 1));
             horsePanel.add(horseNames[i]);
 
-            horsePanel.add(new JLabel("Horse " + (i + 1) + " Symbol:"));
+            horsePanel.add(new JLabel("Horse " + (i + 1) + " Symbol:")); //symbol(a character)
             horseSymbols[i] = new JTextField("#");
             horsePanel.add(horseSymbols[i]);
+
+            horsePanel.add(new JLabel("Horse " + (i + 1) + " Confidence:")); //confidence
+            horseNames[i] = new JTextField("0.5");
+            horsePanel.add(horseNames[i]);
         }
 
+        //refreshes the panel
         horsePanel.revalidate();
         horsePanel.repaint();
     }
@@ -136,7 +143,7 @@ class StartRaceGUI extends JFrame
                     return;
                 }
             }
-            catch (NumberFormatException ee) 
+            catch (NumberFormatException ex) //incase the track length is not a digit
             {
                 JOptionPane.showMessageDialog(null, "Please enter a valid number!", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
@@ -144,6 +151,7 @@ class StartRaceGUI extends JFrame
             int numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem()); // Get the user input values
             String weatherConditionString =(String) weatherCondition.getSelectedItem(); // Get the user input values
             String trackShapeString = (String) trackShape.getSelectedItem(); // Get the user input values
+            horsePanel.setVisible(false);
 
             Race race = new Race(trackLengthInteger, numberOfLanes, weatherConditionString, trackShapeString);
 
@@ -152,8 +160,21 @@ class StartRaceGUI extends JFrame
             {
                 String horseName = horseNames[i].getText();
                 char horseSymbol = horseSymbols[i].getText().charAt(0);
-                double confidence = Math.random(); // Assign random confidence
-                race.addHorse(new Horse(horseSymbol, horseName, confidence), i + 1);
+                double confidence = 0.5;
+                try
+                {
+                    confidence = Double.parseDouble(horseConfidences[i].getText());
+                    if (confidence < 0 || confidence > 1)
+                    {
+                        throw new IllegalArgumentException("Confidence must be between 0 and 1");
+                    }
+                }
+                catch (IllegalArgumentException ex)
+                {
+                    JOptionPane.showMessageDialog(null, "Please enter a valid confidence value between 0 and 1!", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                race.addHorse(new Horse(horseSymbol, horseName, confidence), i + 1); //adding the information into the horse class
             }
             new Thread(() -> race.startRace()).start();
         }
@@ -327,18 +348,13 @@ class Race
         boolean finished = false;
         
         //reset all the lanes (all horses not fallen and back to 0). 
-        lane1Horse.goBackToStart();
-        lane2Horse.goBackToStart();
-        lane3Horse.goBackToStart();
+        for (int i = 0; i<laneCount; i++) 
+        {
+            numberOfHorses.get(i).goBackToStart();
+        }
                       
         while (!finished)
-        {
-            //move each horse back to start
-            for(int i = 0; i<laneCount; i++)
-            {
-                numberOfHorses.get(i).goBackToStart();
-            }
-                        
+        { 
             //print the race positions
             printRace();
             
