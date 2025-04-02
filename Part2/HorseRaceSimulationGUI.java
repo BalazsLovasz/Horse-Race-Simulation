@@ -11,10 +11,11 @@ import java.awt.event.ActionListener;
 import java.util.concurrent.TimeUnit;
 import javax.swing.*;
 import java.util.ArrayList;
+import javax.security.auth.Refreshable;
 
 class StartRaceGUI extends JFrame 
 {
-    private JPanel customisingPanel, startButtonPanel, raceDisplayPanel, mainPanel, horsePanel;
+    private JPanel customisingPanel, raceDisplayPanel, mainPanel, horsePanel;
     private JTextField trackLength;
     private JButton startRaceButton;
     private JComboBox<String> laneCountList;
@@ -24,8 +25,6 @@ class StartRaceGUI extends JFrame
     private JTextField[] horseNames = new JTextField[5];
     private JTextField[] horseSymbols = new JTextField[5];
     private JTextField[] horseConfidences = new JTextField[5];
-
-    private RaceTrackPanel raceTrackPanel;
 
     public StartRaceGUI()
     {
@@ -44,11 +43,6 @@ class StartRaceGUI extends JFrame
         raceDisplayPanel = new JPanel();
         raceDisplayPanel.setBackground(Color.LIGHT_GRAY);
         mainPanel.add(raceDisplayPanel, BorderLayout.CENTER);
-
-        //Panel for the start button
-        startButtonPanel = new JPanel();
-        startButtonPanel.setLayout(new BorderLayout());
-        mainPanel.add(startButtonPanel, BorderLayout.NORTH);
 
         //Custumising panel
         customisingPanel = new JPanel();
@@ -88,7 +82,7 @@ class StartRaceGUI extends JFrame
         startRaceButton.setFont(new Font("Arial", Font.BOLD, 16));
         startRaceButton.setBackground(new Color(50, 150, 250)); // sets color to light blue
         startRaceButton.setForeground(Color.WHITE);
-        startButtonPanel.add(startRaceButton);
+        mainPanel.add(startRaceButton, BorderLayout.NORTH);
 
         //setting the font for every text
         Font labelFont = new Font("Arial", Font.PLAIN, 14);
@@ -100,6 +94,8 @@ class StartRaceGUI extends JFrame
                 components[i].setFont(labelFont); // sets the font to all JLabels
             }
         }
+        // Triggers the updateHorseInputs method on initialization
+        updateHorseInputs();
     }
 
     //this method updates the number of horses that show up on the screen
@@ -120,8 +116,8 @@ class StartRaceGUI extends JFrame
             horsePanel.add(horseSymbols[i]);
 
             horsePanel.add(new JLabel("Horse " + (i + 1) + " Confidence:")); //confidence
-            horseNames[i] = new JTextField("0.5");
-            horsePanel.add(horseNames[i]);
+            horseConfidences[i] = new JTextField("0.5");
+            horsePanel.add(horseConfidences[i]);
         }
 
         //refreshes the panel
@@ -153,11 +149,9 @@ class StartRaceGUI extends JFrame
             int numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem()); // Get the user input values
             String weatherConditionString =(String) weatherCondition.getSelectedItem(); // Get the user input values
             String trackShapeString = (String) trackShape.getSelectedItem(); // Get the user input values
-            horsePanel.setVisible(false);
             
             //Stores the number of horses in the race
             Horse[] horses = new Horse[numberOfLanes];
-            Race race = new Race(trackLengthInteger, numberOfLanes, weatherConditionString, trackShapeString);
 
             // Adding horses based on selected number of lanes
             for (int i = 0; i < numberOfLanes; i++) 
@@ -180,53 +174,64 @@ class StartRaceGUI extends JFrame
                 }
                 horses[i] = new Horse(horseSymbol, horseName, confidence);
             }
-            // Removing the placeholder panel
-            mainPanel.remove(raceDisplayPanel);
+            // this create the graphical track panel
+            RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackShapeString);
 
-            // This creates and updates the actual track panel
-            RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackLengthInteger, numberOfLanes, horses);
+            // this updates the race display panel
+            mainPanel.removeAll();  // Removes anything that was previously there
+            mainPanel.add(raceTrackPanel, BorderLayout.CENTER);  // Adds the new track panel
 
-            mainPanel.add(raceTrackPanel, BorderLayout.CENTER);
+            // Refresh the race display panel
             mainPanel.revalidate();
             mainPanel.repaint();
 
-            new Thread(() -> race.startRace()).start();
         }
     }
 }
 
-class RaceTrackPanel extends JPanel //This class is what simulates the track and moving horses
+class RaceTrackPanel extends JPanel 
 {
-    private int trackLength;
-    private int laneCount;
-    private Horse[] horses;
-    private int[] horsePositions; // Store each horse's current position
+    private String trackShape;
 
-    public RaceTrackPanel(int trackLength, int numberOfLanes, Horse[] horses) 
+    public RaceTrackPanel(String trackShape) 
     {
-        this.trackLength = trackLength;
-        this.laneCount = numberOfLanes;
-        this.horses = horses;
-        this.horsePositions = new int[numberOfLanes]; // Start positions at 50 pixels
+        this.trackShape = trackShape;
     }
 
     @Override
     protected void paintComponent(Graphics g) 
     {
-        super.paintComponent(g); // Clears the previous drawings
+        super.paintComponent(g); // Clear previous drawings
 
-        int laneHeight = getHeight() / (laneCount + 1); // Space between lanes
+        int width = getWidth();   // Panel width
+        int height = getHeight(); // Panel height
 
-         // Draws the track lanes
-         g.setColor(Color.WHITE);
-         for (int i = 1; i <= laneCount; i++) 
-         {
-             int laneY = i * laneHeight;
-             g.drawLine(50, laneY, 50 + trackLength, laneY); // Horizontal lane lines
-         }
-        // Draws the finish line
-        g.setColor(Color.RED);
-        g.fillRect(50 + trackLength * 10, 0, 10, getHeight());
+        g.setColor(Color.BLACK); // Track color
+
+        if (trackShape.equals("Oval")) 
+        {
+            // Draw an oval track
+            g.drawOval(50, 50, width - 100, height - 100);
+            g.drawOval(100, 100, width - 200, height - 200);
+
+        } 
+        else if (trackShape.equals("Figure-Eight")) 
+        {
+            // Draw two connected loops for figure-eight
+            g.drawOval(50, 50, (width / 2) - 60, height - 100);
+            g.drawOval((width / 2) + 10, 50, (width / 2) - 60, height - 100);
+            g.drawLine(width / 2, 50, width / 2, height - 50); // Middle crossing
+
+        }
+        else if (trackShape.equals("Straight")) 
+        {
+            // Draw straight lanes
+            for (int i = 1; i <= 5; i++) 
+            {
+                int laneY = 50 + (i * 40);
+                g.drawLine(50, laneY, width - 50, laneY);
+            }
+        }
     }
 }
 
