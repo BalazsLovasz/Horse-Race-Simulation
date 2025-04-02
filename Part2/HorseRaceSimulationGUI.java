@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import javax.swing.*;
 import java.util.ArrayList;
 import javax.security.auth.Refreshable;
+import javax.swing.plaf.ColorUIResource;
 
 class StartRaceGUI extends JFrame 
 {
@@ -243,9 +244,41 @@ class RaceTrackPanel extends JPanel
         } 
         else if (trackShape.equals("Figure-Eight")) 
         {
-            // Draw two connected loops for figure-eight
-            g.drawOval(50, 50, (width / 2)-50, height - 100);
-            g.drawOval((width / 2), 50, (width / 2)-50, height - 100);
+            // Dynamically adjust the size of the figure-eight based on the number of lanes
+            int trackSpacing = (laneCount * 10); // Adjust spacing based on lanes
+            int ovalWidth = width / 4;
+            int ovalHeight = height / 4;
+    
+            // Calculate the position of the ovals for the figure-eight shape
+            int oval1X = 50; // X-coordinate for the first oval (left)
+            int oval2X = width / 2; // X-coordinate for the second oval (right)
+            int ovalY = height / 3;  // Y-coordinate for both ovals (same level)
+    
+            // Draw the first oval (left side of the figure-eight)
+            g.drawOval(oval1X, ovalY, ovalWidth, ovalHeight);
+            
+            // Draw the second oval (right side of the figure-eight)
+            g.drawOval(oval2X, ovalY, ovalWidth, ovalHeight);
+            
+            // Draw the connecting curved paths (forming an infinity shape)
+            // Top path (curved)
+            g.drawArc(oval1X + ovalWidth/2, ovalY, ovalWidth/2, ovalHeight/2, 0, 90);
+            // Bottom path (curved)
+            g.drawArc(oval1X + ovalWidth/2, ovalY, (oval2X - oval1X - ovalWidth), 20, 180, 90);
+    
+            // If lanes are involved, draw additional tracks in each lane for both ovals and connecting paths
+            for (int i = 0; i < laneCount; i++) 
+            {
+                int offset = i * 40;  // Space between each lane
+                // Upper oval
+                g.drawOval(oval1X + offset, ovalY + offset, ovalWidth, ovalHeight);
+                // Lower oval
+                g.drawOval(oval2X + offset, ovalY + offset, ovalWidth, ovalHeight);
+    
+                // Draw the connecting curved paths for each lane
+                g.drawArc(oval1X + ovalWidth + offset, ovalY + ovalHeight / 2 - 10 + offset, (oval2X - oval1X - ovalWidth), 20, 0, 180);
+                g.drawArc(oval1X + ovalWidth + offset, ovalY + ovalHeight / 2 + 10 + offset, (oval2X - oval1X - ovalWidth), 20, 180, 180);
+            }
         }
         else if (trackShape.equals("Straight")) 
         {
