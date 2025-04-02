@@ -25,6 +25,8 @@ class StartRaceGUI extends JFrame
     private JTextField[] horseSymbols = new JTextField[5];
     private JTextField[] horseConfidences = new JTextField[5];
 
+    private RaceTrackPanel raceTrackPanel;
+
     public StartRaceGUI()
     {
         //setting up the window
@@ -64,7 +66,7 @@ class StartRaceGUI extends JFrame
         customisingPanel.add(laneCountList);
 
         // Horse Input Panel (Initially Empty)
-        horsePanel = new JPanel(new GridLayout(0, 2, 10, 10));
+        horsePanel = new JPanel(new GridLayout(0, 2, 2, 2));
         add(horsePanel, BorderLayout.SOUTH); 
 
         // Listener to update horse inputs dynamically
@@ -127,8 +129,8 @@ class StartRaceGUI extends JFrame
         horsePanel.repaint();
     }
 
-     // Action Listener for "Start Race" button
-     private class StartRaceButtonListener implements ActionListener 
+    // Action Listener for "Start Race" button
+    private class StartRaceButtonListener implements ActionListener 
      {
         @Override
         public void actionPerformed(ActionEvent e) 
@@ -152,7 +154,9 @@ class StartRaceGUI extends JFrame
             String weatherConditionString =(String) weatherCondition.getSelectedItem(); // Get the user input values
             String trackShapeString = (String) trackShape.getSelectedItem(); // Get the user input values
             horsePanel.setVisible(false);
-
+            
+            //Stores the number of horses in the race
+            Horse[] horses = new Horse[numberOfLanes];
             Race race = new Race(trackLengthInteger, numberOfLanes, weatherConditionString, trackShapeString);
 
             // Adding horses based on selected number of lanes
@@ -174,10 +178,55 @@ class StartRaceGUI extends JFrame
                     JOptionPane.showMessageDialog(null, "Please enter a valid confidence value between 0 and 1!", "Error", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
-                race.addHorse(new Horse(horseSymbol, horseName, confidence), i + 1); //adding the information into the horse class
+                horses[i] = new Horse(horseSymbol, horseName, confidence);
             }
+            // Removing the placeholder panel
+            mainPanel.remove(raceDisplayPanel);
+
+            // This creates and updates the actual track panel
+            RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackLengthInteger, numberOfLanes, horses);
+
+            mainPanel.add(raceTrackPanel, BorderLayout.CENTER);
+            mainPanel.revalidate();
+            mainPanel.repaint();
+
             new Thread(() -> race.startRace()).start();
         }
+    }
+}
+
+class RaceTrackPanel extends JPanel //This class is what simulates the track and moving horses
+{
+    private int trackLength;
+    private int laneCount;
+    private Horse[] horses;
+    private int[] horsePositions; // Store each horse's current position
+
+    public RaceTrackPanel(int trackLength, int numberOfLanes, Horse[] horses) 
+    {
+        this.trackLength = trackLength;
+        this.laneCount = numberOfLanes;
+        this.horses = horses;
+        this.horsePositions = new int[numberOfLanes]; // Start positions at 50 pixels
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) 
+    {
+        super.paintComponent(g); // Clears the previous drawings
+
+        int laneHeight = getHeight() / (laneCount + 1); // Space between lanes
+
+         // Draws the track lanes
+         g.setColor(Color.WHITE);
+         for (int i = 1; i <= laneCount; i++) 
+         {
+             int laneY = i * laneHeight;
+             g.drawLine(50, laneY, 50 + trackLength, laneY); // Horizontal lane lines
+         }
+        // Draws the finish line
+        g.setColor(Color.RED);
+        g.fillRect(50 + trackLength * 10, 0, 10, getHeight());
     }
 }
 
@@ -497,6 +546,16 @@ class Race
             System.out.print(aChar);
             i = i + 1;
         }
+    }
+    //returns the length of the track
+    public int getTrackLength() 
+    {
+        return this.trackLength;
+    }
+
+    public int getLaneCount()
+    {
+        return this.laneCount;
     }
 }
 
