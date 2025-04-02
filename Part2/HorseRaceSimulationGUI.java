@@ -14,7 +14,7 @@ import java.util.ArrayList;
 
 class StartRaceGUI extends JFrame 
 {
-    private JPanel customisingPanel, startButtonPanel, raceDisplayPanel, mainPanel;
+    private JPanel customisingPanel, startButtonPanel, raceDisplayPanel, mainPanel, horsePanel;
     private JTextField trackLength;
     private JButton startRaceButton;
     private JComboBox<String> laneCountList;
@@ -62,6 +62,14 @@ class StartRaceGUI extends JFrame
         laneCountList = new JComboBox<String>(new String[]{"2","3","4","5"});
         customisingPanel.add(laneCountList);
 
+        // Horse Input Panel (Initially Empty)
+        horsePanel = new JPanel(new GridLayout(0, 2, 10, 10));
+        add(horsePanel, BorderLayout.SOUTH);
+ 
+
+        // Listener to update horse inputs dynamically
+        laneCountList.addActionListener(e -> updateHorseInputs());
+
         //Choosing the weather
         customisingPanel.add(new JLabel("Weather Condition:"));
         weatherCondition = new JComboBox<String>(new String[]{"Dry","Muddy","Icy"});
@@ -84,23 +92,32 @@ class StartRaceGUI extends JFrame
         Component[] components = customisingPanel.getComponents();
         for (int i = 0; i < components.length; i++) 
         {
-            if (components[i] instanceof JLabel) {
+            if (components[i] instanceof JLabel) 
+            {
                 components[i].setFont(labelFont); // sets the font to all JLabels
             }
         }
+    }
 
-        // Horse Inputs (5 Max)
-        for (int i = 0; i < 5; i++) 
+    //this method updates the number of horses that show up on the screen
+    private void updateHorseInputs() 
+    {
+        horsePanel.removeAll();
+        int numLanes = Integer.parseInt((String) laneCountList.getSelectedItem());
+
+        for (int i = 0; i < numLanes; i++) 
         {
-            customisingPanel.add(new JLabel("Horse " + (i + 1) + " Name:"));
+            horsePanel.add(new JLabel("Horse " + (i + 1) + " Name:"));
             horseNames[i] = new JTextField("Horse" + (i + 1));
-            customisingPanel.add(horseNames[i]);
+            horsePanel.add(horseNames[i]);
 
-            customisingPanel.add(new JLabel("Horse " + (i + 1) + " Symbol:"));
+            horsePanel.add(new JLabel("Horse " + (i + 1) + " Symbol:"));
             horseSymbols[i] = new JTextField("#");
-            customisingPanel.add(horseSymbols[i]);
+            horsePanel.add(horseSymbols[i]);
         }
 
+        horsePanel.revalidate();
+        horsePanel.repaint();
     }
 
      // Action Listener for "Start Race" button
@@ -129,9 +146,6 @@ class StartRaceGUI extends JFrame
             String trackShapeString = (String) trackShape.getSelectedItem(); // Get the user input values
 
             Race race = new Race(trackLengthInteger, numberOfLanes, weatherConditionString, trackShapeString);
-            race.addHorse(new Horse('#', "Bob", 0.2), 1);
-            race.addHorse(new Horse('I', "Jeff", 0.5), 2);
-            race.addHorse(new Horse('O', "Chad", 0.8), 3);
 
             // Adding horses based on selected number of lanes
             for (int i = 0; i < numberOfLanes; i++) 
