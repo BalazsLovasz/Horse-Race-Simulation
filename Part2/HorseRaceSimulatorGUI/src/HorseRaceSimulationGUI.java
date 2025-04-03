@@ -74,7 +74,7 @@ class StartRaceGUI extends JFrame
 
         //Choosing the track shape
         customisingPanel.add(new JLabel("Track Shape:"));
-        trackShape = new JComboBox<String>(new String[]{"Oval","Figure-Eight","Custom"});
+        trackShape = new JComboBox<String>(new String[]{"Oval","Figure-Eight","Straight", "Zig-Zag"});
         customisingPanel.add(trackShape);
 
         //Start Button
@@ -128,15 +128,6 @@ class StartRaceGUI extends JFrame
         String trackShapeString = (String) trackShape.getSelectedItem(); //Get the user input values
         int numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem()); // Get the user input values
 
-        RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackShapeString, numberOfLanes);  // Create a new race track panel
-
-        // Remove the old race track panel and add the new one
-        raceDisplayPanel.removeAll();
-        raceDisplayPanel.add(raceTrackPanel, BorderLayout.CENTER);  // Adds the new track panel
-
-        // Refresh the race display panel
-        raceDisplayPanel.revalidate();
-        raceDisplayPanel.repaint();
     }
 
     // Action Listener for "Start Race" button
@@ -173,6 +164,8 @@ class StartRaceGUI extends JFrame
                 String horseName = horseNames[i].getText();
                 char horseSymbol = horseSymbols[i].getText().charAt(0);
                 double confidence = 0.5;
+                int radius = 80 + (i * 20); // Different lane distances
+
                 try
                 {
                     confidence = Double.parseDouble(horseConfidences[i].getText());
@@ -193,7 +186,7 @@ class StartRaceGUI extends JFrame
             customisingPanel.setVisible(false);
 
             // this create the graphical track panel
-            RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackShapeString, numberOfLanes);
+            RaceTrackPanel raceTrackPanel = new RaceTrackPanel(trackShapeString, numberOfLanes, horses, trackLengthInteger);
 
             // this updates the race display panel
             mainPanel.removeAll();  // Removes anything that was previously there
@@ -208,13 +201,41 @@ class StartRaceGUI extends JFrame
 
 class RaceTrackPanel extends JPanel 
 {
+    private Horse[] horses;
     private String trackShape;
     private int laneCount;
+    private Timer raceTimer;
+    private int trackLength;
 
-    public RaceTrackPanel(String trackShape, int laneCount) 
+
+    public RaceTrackPanel(String trackShape, int laneCount, Horse[] horses, int trackLength) 
     {
         this.trackShape = trackShape;
         this.laneCount = laneCount;
+        this.horses = horses;
+        this.trackLength = trackLength;
+
+
+        // Timer to update horse positions
+        raceTimer = new Timer(100, e -> updateRaceOval());
+        raceTimer.start();
+    }
+
+    private void updateRaceOval() {
+        boolean raceFinished = false;
+
+        for (Horse horse : horses) {
+            horse.moveHorseCircular();
+            if (horse.getAngle() >= 360) {
+                raceFinished = true;
+            }
+            repaint(); // Redraw the race track
+        }
+
+        if (raceFinished) {
+            raceTimer.stop();
+            JOptionPane.showMessageDialog(this, "Race Over! Check the results.");
+        }
     }
 
     @Override
@@ -238,8 +259,17 @@ class RaceTrackPanel extends JPanel
             // Draw the outer and inner ovals based on lane count
             for (int i = 0; i < laneCount; i++) 
             {
+                Horse horse = horses[i];
+
                 int offset = i * 40;  // Space between each lane
                 g.drawOval(offsetX + offset, offsetY + offset, ovalWidth - (offset * 2), ovalHeight - (offset * 2));
+
+                // Calculate position of the horse for each track shape
+                int x = horse.getX(width, height, laneCount, trackShape, i); // X position of the horse
+                int y = horse.getY(width, height, laneCount, trackShape, i); // Y position of the horse
+
+                // Draw the horse symbol at the calculated position
+                g.drawString(String.valueOf(horse.getSymbol()), x, y );
             }
         } 
         else if (trackShape.equals("Figure-Eight")) 
@@ -257,7 +287,7 @@ class RaceTrackPanel extends JPanel
                 // Left oval (Loop 1) - Moves to the right
                 g.drawOval(50 + offset, 50, ovalWidth, ovalHeight);
 
-                // Right oval (Loop 2) - Moves to the right but with a fixed distance between
+                // Right oval (Loop 2) - Moves to the right 
                 g.drawOval((width / 2) - 10 + offset, 50, ovalWidth, ovalHeight);
             }
         }
@@ -265,11 +295,15 @@ class RaceTrackPanel extends JPanel
         else if (trackShape.equals("Straight")) 
         {
             // Draw straight lanes
-            for (int i = 1; i <= 5; i++) 
+            for (int i = 0; i < laneCount; i++) 
             {
-                int laneY = 50 + (i * 40);
+                int laneY = 200 + (i * 40);
                 g.drawLine(50, laneY, width - 50, laneY);
             }
+        }
+        else if (trackShape.equals("Zig-Zag")) 
+        {
+
         }
     }
 }
@@ -283,6 +317,8 @@ class Horse
     private int horseDistance;
     private boolean hasFallen;
     private double horseConfidence;
+    private double angle; // Angle for oval movement
+    private int radius; // Distance from track center
 
     public Horse(char horseSymbol, String horseName, double horseConfidence) //constructor
     {
@@ -293,9 +329,75 @@ class Horse
         this.horseDistance = 0;
     }
 
-    public void fall() //method that sets horse to fallen
+    public Horse(char symbol, String name, double confidence, int radius) {
+        this.horseSymbol = symbol;
+        this.horseName = name;
+        this.horseConfidence = confidence;
+        this.angle = 0; // Start at the beginning of the oval
+        this.radius = radius;
+    }
+
+    public void moveHorse()
     {
-        this.hasFallen = true;
+        //if the horse has fallen it cannot move, 
+        //so only run if it has not fallen
+        if  (!this.hasFallen())
+        {
+            int speed = (int) (Math.random() * 10 * this.horseConfidence + 1);
+            this.horseDistance += speed;
+        }
+            //the probability that the horse will fall is very small (max is 0.1)
+            //but will also will depends exponentially on confidence 
+            //so if you double the confidence, the probability that it will fall is *2
+        else if (Math.random() < (0.1*this.horseConfidence*this.horseConfidence))
+        {
+           this.hasFallen = true;
+        }
+    }
+
+    public void moveHorseCircular() 
+    {
+        // Move based on confidence (higher confidence = faster movement)
+        double speed = Math.random() * 2 * this.horseConfidence + 0.5;
+        angle += speed;
+
+        // Ensure angle stays within 360 degrees
+        if (angle >= 360) 
+        {
+            angle -= 360;
+        }
+    }
+
+    // Get the X position based on track shape
+    public int getX(int width, int height, int laneCount, String trackShape, int laneIndex) {
+        // Depending on track shape, calculate X position
+        int offset = laneIndex * 40; // Space between lanes
+        int ovalWidth = width - 200;
+        int ovalHeight = height - 100;
+
+        
+        return (int) (width / 2 + (ovalWidth / 2 + offset) * Math.cos(getAngle()));  // Oval formula
+    }
+
+     // Get the Y position based on track shape
+     public int getY(int width, int height, int laneCount, String trackShape, int laneIndex) {
+        // Depending on track shape, calculate Y position
+        int offset = laneIndex * 40; // Space between lanes
+        int ovalWidth = width - 200;
+        int ovalHeight = height - 100;
+
+
+        return (int) (height / 2 + (ovalHeight / 2 + offset) * Math.sin(getAngle()));  // Oval formula
+    }
+
+    public double getAngle() 
+    {
+        return Math.toRadians(this.angle); // Convert degrees to radians
+    }
+
+    public int getRadius() 
+    {
+        return this.radius;
     }
 
     public double getConfidence() //returns the confidence of the horse
@@ -328,11 +430,6 @@ class Horse
     {
        return this.hasFallen;
     }
-
-    public void moveForward() //moves the horse forward by 1 index;
-    {
-        this.horseDistance++;
-    }
     
     public void setConfidence(double newConfidence) //asigns a new confident to the horse
     {
@@ -352,257 +449,6 @@ class Horse
     }
 }
 
-/**
- * A three-horse race, each horse running in its own lane
- * for a given distance
- * 
- * @author McRaceface
- * @version 1.0
- */
-class Race
-{
-    private int trackLength;
-    private int laneCount;
-    private String trackShape;
-    private String weatherCondition;
-    private Horse lane1Horse;
-    private Horse lane2Horse;
-    private Horse lane3Horse;
-    private Horse lane4Horse;
-    private Horse lane5Horse;
-    private static ArrayList<Horse> numberOfHorses = new ArrayList<Horse>();
-
-    /**
-     * Constructor for objects of class Race
-     * Initially there are no horses in the lanes
-     * 
-     * @param trackLength the length of the racetrack (in metres...)
-     */
-    public Race(int trackLength, int laneCount, String trackShape, String weatherCondition)
-    {
-        // initialise instance variables
-        this.trackLength = trackLength;
-        this.laneCount = laneCount;
-        this.trackShape = trackShape;
-        this.weatherCondition = weatherCondition;
-        lane1Horse = null;
-        lane2Horse = null;
-        lane3Horse = null;
-        lane4Horse = null;
-        lane5Horse = null;
-
-    }
-    
-    /**
-     * Adds a horse to the race in a given lane
-     * 
-     * @param theHorse the horse to be added to the race
-     * @param laneNumber the lane that the horse will be added to
-     */
-    public void addHorse(Horse theHorse, int laneNumber)
-    {
-        if (laneNumber == 1)
-        {
-            lane1Horse = theHorse;
-        }
-        else if (laneNumber == 2)
-        {
-            lane2Horse = theHorse;
-        }
-        else if (laneNumber == 3)
-        {
-            lane3Horse = theHorse;
-        }
-        else if (laneNumber == 4)
-        {
-            lane4Horse = theHorse;
-        }
-        else if (laneNumber == 5)
-        {
-            lane5Horse = theHorse;
-        }
-        else
-        {
-            System.out.println("Cannot add horse to lane " + laneNumber + " because there is no such lane");
-            return;
-        }
-        numberOfHorses.add(theHorse);
-    }
-    
-    /**
-     * Start the race
-     * The horse are brought to the start and
-     * then repeatedly moved forward until the 
-     * race is finished
-     */
-    public void startRace()
-    {
-    
-        //declare a local variable to tell us when the race is finished
-        boolean finished = false;
-        
-        //reset all the lanes (all horses not fallen and back to 0). 
-        for (int i = 0; i<laneCount; i++) 
-        {
-            numberOfHorses.get(i).goBackToStart();
-        }
-                      
-        while (!finished)
-        { 
-            //print the race positions
-            printRace();
-            
-            //if any of the three horses has won the race is finished
-            if ( raceWonBy(lane1Horse) || raceWonBy(lane2Horse) || raceWonBy(lane3Horse) || raceWonBy(lane4Horse) || raceWonBy(lane5Horse))
-            {
-                finished = true;
-            }
-            if (lane1Horse.hasFallen() && lane2Horse.hasFallen() && lane3Horse.hasFallen() && lane4Horse.hasFallen() && lane5Horse.hasFallen()) 
-            {
-                System.out.println("All horses have fallen! The race is canceled.");
-                finished = true;
-            }
-           
-            //wait for 100 milliseconds
-            try{
-                TimeUnit.MILLISECONDS.sleep(100);
-            }catch(Exception e){}
-        }
-    }
-    
-    /**
-     * Randomly make a horse move forward or fall depending
-     * on its confidence rating
-     * A fallen horse cannot move
-     * 
-     * @param theHorse the horse to be moved
-     */
-    private void moveHorse(Horse theHorse)
-    {
-        //if the horse has fallen it cannot move, 
-        //so only run if it has not fallen
-        if  (!theHorse.hasFallen())
-        {
-            //the probability that the horse will move forward depends on the confidence;
-            if (Math.random() < theHorse.getConfidence())
-            {
-               theHorse.moveForward();
-            }
-            
-            //the probability that the horse will fall is very small (max is 0.1)
-            //but will also will depends exponentially on confidence 
-            //so if you double the confidence, the probability that it will fall is *2
-            else if (Math.random() < (0.1*theHorse.getConfidence()*theHorse.getConfidence()))
-            {
-                theHorse.fall();
-            }
-        }
-    }
-        
-    /** 
-     * Determines if a horse has won the race
-     *
-     * @param theHorse The horse we are testing
-     * @return true if the horse has won, false otherwise.
-     */
-    private boolean raceWonBy(Horse theHorse)
-    {
-        if (theHorse.getDistanceTravelled() >= trackLength)
-        {
-            System.err.println("And the winner is... " + theHorse.getName());
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    
-    /***
-     * Print the race on the terminal
-     */
-    private void printRace()
-    {
-        System.out.print("\033[H\033[2J");
-        System.out.flush();
-
-        multiplePrint('=',trackLength+3); //top edge of track
-        System.out.println();
-        
-        for(int i = 0; i<numberOfHorses.size(); i++)
-        {
-            printLane(numberOfHorses.get(i));
-            System.out.println();
-        }
-        
-        multiplePrint('=',trackLength+3); //bottom edge of track
-        System.out.println();    
-    }
-    
-    /**
-     * print a horse's lane during the race
-     * for example
-     * |           X                      |
-     * to show how far the horse has run
-     */
-    private void printLane(Horse theHorse)
-    {
-        //calculate how many spaces are needed before
-        //and after the horse
-        int spacesBefore = theHorse.getDistanceTravelled();
-        int spacesAfter = trackLength - theHorse.getDistanceTravelled();
-        
-        //print a | for the beginning of the lane
-        System.out.print('|');
-        
-        //print the spaces before the horse
-        multiplePrint(' ',spacesBefore);
-        
-        //if the horse has fallen then print dead
-        //else print the horse's symbol
-        if(theHorse.hasFallen())
-        {
-            System.out.print('X');
-        }
-        else
-        {
-            System.out.print(theHorse.getSymbol());
-        }
-        
-        //print the spaces after the horse
-        multiplePrint(' ',spacesAfter);
-        
-        //print the | for the end of the track
-        System.out.print("|  " + theHorse.getName() + " (Current confidence " + theHorse.getConfidence() + ")");
-    }
-        
-    
-    /***
-     * print a character a given number of times.
-     * e.g. printmany('x',5) will print: xxxxx
-     * 
-     * @param aChar the character to Print
-     */
-    private void multiplePrint(char aChar, int times)
-    {
-        int i = 0;
-        while (i < times)
-        {
-            System.out.print(aChar);
-            i = i + 1;
-        }
-    }
-    //returns the length of the track
-    public int getTrackLength() 
-    {
-        return this.trackLength;
-    }
-
-    public int getLaneCount()
-    {
-        return this.laneCount;
-    }
-}
 
 class HorseRaceSimulationGUI
 {
