@@ -289,6 +289,7 @@
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
         
         int width = getWidth();
         int height = getHeight();
@@ -306,7 +307,7 @@
 
                 // Draw horizontal red finish line (thick and spans all lanes)
                 g.setColor(Color.RED);
-                g.fillRect(width - 100, height/2, -i*40, 5);
+                g.fillRect(100, height/2, i*40, 5);
                 g.setColor(Color.BLACK);
             }
 
@@ -321,9 +322,10 @@
                 if (horse.hasFallen()) 
                 {
                     // Drawing a red "X" for fallen horses
-                    g.setColor(Color.RED);
-                    g.drawLine(x - 7, y - 9, x + 7, y + 9); // Diagonal \
-                    g.drawLine(x + 7, y - 9, x - 7, y + 9); // Diagonal /
+                    g2d.setColor(Color.RED);
+                    g2d.setStroke(new BasicStroke(3)); // Line thickness
+                    g2d.drawLine(x - 7, y - 9, x + 7, y + 9); // Diagonal \
+                    g2d.drawLine(x + 7, y - 9, x - 7, y + 9); // Diagonal /
                 } 
                 else
                 {
@@ -334,37 +336,64 @@
         }
         else if (trackShape.equals("Figure-Eight")) 
         {  
-            int laneSpacing = 40; // Controls the gap between lanes
-            int ovalWidth = (width / 2) - 60; // Constant width of the ovals
-            int ovalHeight = height - 100;   // Constant height of the ovals
-
-            
-
+            //drawing the track
             for (int i = 0; i < laneCount; i++) 
             {
-                // Offset controls the spacing between each lane
-                int offset = i * laneSpacing;
+                int laneOffset = i * 40;
+                int resolution = 100; // Points to draw
+                int[] xPoints = new int[resolution];
+                int[] yPoints = new int[resolution];
+                
+                for (int j = 0; j < resolution; j++) 
+                {
+                    double t = 2 * Math.PI * j / resolution;
+                    double scale = (Math.min(width, height)/2) - laneOffset;
+                    xPoints[j] = (int) (width/2 + scale * Math.sin(t));
+                    yPoints[j] = (int) (height/2 + (scale/1.5) * Math.sin(t) * Math.cos(t));
+                }
+                g2d.drawPolyline(xPoints, yPoints, resolution);
 
-                // Left oval (Loop 1) - Moves to the right
-                g.drawOval(50 + offset, 50, ovalWidth, ovalHeight);
-
-                // Right oval (Loop 2) - Moves to the right 
-                g.drawOval((width / 2) - 10 + offset, 50, ovalWidth, ovalHeight);
+                // Drawing horizontal red finish line
+                g.setColor(Color.RED);
+                g.fillRect(width - 111, height/2, -i*40, 5);
+                g.setColor(Color.BLACK);
             }
-         }
- 
-         else if (trackShape.equals("Straight")) 
-         {
-             // Draw straight lanes
-             for (int i = 0; i < laneCount; i++) 
-             {
+
+            //drawing the horses
+            for (int i = 0; i < laneCount; i++) 
+            {
+                Horse horse = horses[i];
+                int x = horse.getX(width, height, trackShape, i);
+                int y = horse.getY(width, height, trackShape, i);
+                
+                if (horse.hasFallen()) 
+                {
+                    // Draw X
+                    g2d.setColor(Color.RED);
+                    g2d.setStroke(new BasicStroke(3));
+                    g2d.drawLine(x-7, y-9, x+7, y+9);
+                    g2d.drawLine(x+7, y-9, x-7, y+9);
+                } 
+                else 
+                {
+                    // Draw horse symbol
+                    g.setColor(Color.BLACK);
+                    g.drawString(String.valueOf(horse.getSymbol()), x, y);
+                }
+            }
+        } 
+        else if (trackShape.equals("Straight")) 
+        {
+            // Draw straight lanes
+            for (int i = 0; i < laneCount; i++) 
+            {
                 g.drawLine(50, 100+(i*40), width - 50, 100+(i*40));
 
                 // Draw horizontal red finish line (thick and spans all lanes)
                 g.setColor(Color.RED);
                 g.fillRect(width - 50, 100, 5, i*40);
                 g.setColor(Color.BLACK);
-             }
+            }
 
              // Draw horses
             g.setColor(Color.BLACK);
@@ -377,9 +406,10 @@
                 if (horse.hasFallen()) 
                 {
                     // Drawing a red "X" for fallen horses
-                    g.setColor(Color.RED);
-                    g.drawLine(x - 7, y - 9, x + 7, y + 9); // Diagonal \
-                    g.drawLine(x + 7, y - 9, x - 7, y + 9); // Diagonal /
+                    g2d.setColor(Color.RED);
+                    g2d.setStroke(new BasicStroke(3));
+                    g2d.drawLine(x-7, y-9, x+7, y+9);
+                    g2d.drawLine(x+7, y-9, x-7, y+9);
                 } 
                 else
                 {
@@ -404,8 +434,6 @@
      private double distanceTravelled;
      private boolean hasFallen;
      private double horseConfidence;
-     private double angle; // Angle for oval movement
-     private int radius; // Distance from track center
      private  int trackLength;
  
      public Horse(char horseSymbol, String horseName, double horseConfidence, int trackLength) //constructor
@@ -419,8 +447,8 @@
      }
  
     
-     public void moveHorse() 
-     {
+    public void moveHorse() 
+    {
         if (!this.hasFallen()) 
         {
             // Increase speed multiplier to make movement more visible
@@ -437,11 +465,11 @@
  
     public int getX(int width, int height, String trackShape, int lane) 
     {
-        double progress = this.distanceTravelled / this.trackLength;
-        progress = progress % 1.0; // Keep within 0-1 range
         
         if (trackShape.equals("Oval")) 
         {
+            double progress = this.distanceTravelled / this.trackLength;
+            progress = progress % 1.0; // Keep within 0-1 range
             int ovalWidth = width - 200;
             int ovalHeight = height - 100;
             int centerX = width / 2;
@@ -449,57 +477,69 @@
             int laneOffset = 40 * lane;
             
             // Calculate angle based on progress (0-2π)
-            double angle = progress * 2 * Math.PI;
+            double angle = progress * 2 * Math.PI + Math.PI;
             
             // Calculate position on oval (squashed circle)
             return centerX + (int)((ovalWidth/2 - laneOffset) * Math.cos(angle));
         }
         else if (trackShape.equals("Straight")) 
         {
+            double progress = this.distanceTravelled / this.trackLength;
+            progress = progress % 1.0; 
             // Simple linear movement for straight track
             return 50 + (int)((width - 100) * progress);
         }
-        // Add other track shapes ?
-        
+        else if(trackShape.equals("Figure-Eight"))
+        {
+            double progress = (this.distanceTravelled / trackLength) % 1.0;
+            double angle = progress * 2 * Math.PI + Math.PI/2;
+
+            int laneOffset = lane * 40;
+            double scale = (Math.min(width, height) / 2) - laneOffset;
+            
+            return (int) (width/2 + scale * Math.sin(angle));
+        }        
         return 0;
     }
     
     public int getY(int width, int height, String trackShape, int lane) 
     {
-        double progress = this.distanceTravelled / this.trackLength;
-        progress = progress % 1.0;
         
         if (trackShape.equals("Oval")) 
         {
+            double progress = this.distanceTravelled / this.trackLength;
+            progress = progress % 1.0;
+
             int ovalWidth = width - 200;
             int ovalHeight = height - 100;
             int centerX = width / 2;
             int centerY = height / 2;
             int laneOffset = 40 * lane;
             
-            double angle = progress * 2 * Math.PI;
+            double angle = progress * 2 * Math.PI + Math.PI;
             
             return centerY + (int)((ovalHeight/2 - laneOffset) * Math.sin(angle));
         }
         else if (trackShape.equals("Straight")) 
         {
+            double progress = this.distanceTravelled / this.trackLength;
+            progress = progress % 1.0;
             // Fixed Y position for each lane
             return 100 + (lane * 40);
+        }  
+        else if (trackShape.equals("Figure-Eight")) 
+        {
+            double progress = (this.distanceTravelled / trackLength) % 1.0;
+            double angle = progress * 2 * Math.PI ;
+
+            int laneOffset = lane * 40;
+            double scale = (Math.min(width, height) / 2) - laneOffset;
+            
+            return (int) (height/2 + (scale/1.5) * Math.sin(angle) * Math.cos(angle));
         }
-        // Add other track shapes here...
-        
+    
         return 0;
     }
- 
-     public double getAngle() 
-     {
-         return Math.toRadians(this.angle); // Convert degrees to radians
-     }
- 
-     public int getRadius() 
-     {
-         return this.radius;
-     }
  
      public double getConfidence() //returns the confidence of the horse
      {
