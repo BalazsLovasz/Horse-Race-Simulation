@@ -247,7 +247,8 @@ class StartRaceGUI extends JFrame
                 horses[i].goBackToStart();
             }
             currentRacePanel.resetRace();
-            
+
+            mainPanel.remove(currentRacePanel);
             mainPanel.add(currentRacePanel, BorderLayout.CENTER);
             mainPanel.revalidate();
             mainPanel.repaint();
@@ -303,11 +304,12 @@ class RaceTrackPanel extends JPanel
 
     public void resetRace() 
     {
-        raceFinished = false;
         if (raceTimer != null) 
         {
             raceTimer.stop();
         }
+        raceFinished = false;
+                
         raceTimer = new Timer(50, e -> updateRace());
         raceTimer.start();
     }
@@ -453,16 +455,8 @@ class RaceTrackPanel extends JPanel
                 g2d.drawPolyline(xPoints, yPoints, resolution);
 
                 // Drawing horizontal red finish line
-                int trackRadius = (int)(Math.min(width, height) * 0.4); // 40% of smallest dimension
-                int finishX = width/2 + trackRadius; // Rightmost point of track
-                int finishHeight = laneCount * 40;   // Span all lanes
-                
-                g2d.fillRect(
-                    finishX - 2,               // X position (center line)
-                    height/2 - finishHeight/2, // Y position (centered)
-                    4,                         // Line thickness
-                    finishHeight               // Height
-                );
+                g.setColor(Color.RED);
+                g.fillOval(width/2-7, height/2-6, 12, 12);
                 g.setColor(Color.BLACK);
             }
 
@@ -543,6 +537,10 @@ class Horse
     private double horseConfidence;
     private  int trackLength;
 
+    //accelereation related variables
+    private double currentSpeed;
+    private double acceleration;
+
     public Horse(char horseSymbol, String horseName, double horseConfidence, int trackLength) //constructor
     {
         this.horseName = horseName;
@@ -551,6 +549,8 @@ class Horse
         this.hasFallen = false;
         this.distanceTravelled = 0;
         this.trackLength = trackLength;
+        this.currentSpeed = 0.0;
+        this.acceleration =  0.05 + (horseConfidence * 0.1);
     }
  
     
@@ -559,8 +559,13 @@ class Horse
         if (!this.hasFallen()) 
         {
             // Increase speed multiplier to make movement more visible
-            double speed = 1.0 + (Math.random() * 4 * this.horseConfidence);
-            this.distanceTravelled += speed;
+            double targetSpeed = 1.0 + (Math.random() * 4 * this.horseConfidence);
+
+            if (currentSpeed < targetSpeed) 
+            {
+                currentSpeed = Math.min(currentSpeed + acceleration, targetSpeed);
+            }
+            this.distanceTravelled += currentSpeed;
             
             // Reduce falling chance and make it more confidence-dependent
             if (Math.random() < 0.0001 * Math.exp(this.horseConfidence)) 
@@ -568,6 +573,11 @@ class Horse
                 this.hasFallen = true;
             }
         }
+    }
+
+    public void deccelerateHorse()
+    {
+
     }
 
  
@@ -649,54 +659,55 @@ class Horse
         return 0;
     }
  
-     public double getConfidence() //returns the confidence of the horse
-     {
-         return this.horseConfidence;
-     }
+    public double getConfidence() //returns the confidence of the horse
+    {
+        return this.horseConfidence;
+    }
  
     public double getDistanceTravelled() 
     {
         return this.distanceTravelled;
     }
  
-     public String getName() //returns the name of the horse
-     {
-         return this.horseName;
-     }
- 
-     public char getSymbol() //returns the symbol of the horse
-     {
-        return this.horseSymbol;
-     }
- 
-     public void goBackToStart() //set the horses back to the start line
-     {
-         this.distanceTravelled = 0;
-         this.hasFallen = false;
-     }
- 
-     public boolean hasFallen()// returns wether the horse has fallen or not
-     {
-        return this.hasFallen;
-     }
-     
-     public void setConfidence(double newConfidence) //asigns a new confident to the horse
-     {
-         if(newConfidence >= 0 && newConfidence <=1)
-         {
-             this.horseConfidence = newConfidence;
-         }
-         else
-         {
-             throw new IllegalArgumentException("Confidence must be between 0 and 1"); //incase the inputed confidence is out of bounds
-         }
-     }
- 
-     public void setSymbol(char newSymbol)
-     {
-         this.horseSymbol = newSymbol;
-     }
- }
+    public String getName() //returns the name of the horse
+    {
+        return this.horseName;
+    }
+
+    public char getSymbol() //returns the symbol of the horse
+    {
+    return this.horseSymbol;
+    }
+
+    public void goBackToStart() //set the horses back to the start line
+    {
+        this.distanceTravelled = 0;
+        this.currentSpeed = 0;
+        this.hasFallen = false;
+    }
+
+    public boolean hasFallen()// returns wether the horse has fallen or not
+    {
+    return this.hasFallen;
+    }
+    
+    public void setConfidence(double newConfidence) //asigns a new confident to the horse
+    {
+        if(newConfidence >= 0 && newConfidence <=1)
+        {
+            this.horseConfidence = newConfidence;
+        }
+        else
+        {
+            throw new IllegalArgumentException("Confidence must be between 0 and 1"); //incase the inputed confidence is out of bounds
+        }
+    }
+
+    public void setSymbol(char newSymbol)
+    {
+        this.horseSymbol = newSymbol;
+    }
+}
  
  
  class HorseRaceSimultionGUI
