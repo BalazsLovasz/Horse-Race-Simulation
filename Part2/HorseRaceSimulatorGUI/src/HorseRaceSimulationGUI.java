@@ -309,7 +309,7 @@ class RaceTrackPanel extends JPanel
             raceTimer.stop();
         }
         raceFinished = false;
-                
+
         raceTimer = new Timer(50, e -> updateRace());
         raceTimer.start();
     }
@@ -337,6 +337,7 @@ class RaceTrackPanel extends JPanel
                 if (horse.getDistanceTravelled() < trackLength) 
                 {
                     horse.moveHorse();
+                    horse.deccelerateHorse(trackShape);
                 } 
                 else 
                 {
@@ -540,6 +541,7 @@ class Horse
     //accelereation related variables
     private double currentSpeed;
     private double acceleration;
+    private double progress;
 
     public Horse(char horseSymbol, String horseName, double horseConfidence, int trackLength) //constructor
     {
@@ -550,7 +552,7 @@ class Horse
         this.distanceTravelled = 0;
         this.trackLength = trackLength;
         this.currentSpeed = 0.0;
-        this.acceleration =  0.05 + (horseConfidence * 0.1);
+        this.acceleration =  0.05 + (horseConfidence * 0.01);
     }
  
     
@@ -574,11 +576,38 @@ class Horse
             }
         }
     }
-
-    public void deccelerateHorse()
+    
+    public void deccelerateHorse(String trackShape)
     {
+        boolean inDecelZone = false;
 
+        // Use the progress value that was already calculated in getX/getY
+        if (trackShape.equals("Oval") && (progress >= 0.4 && progress <= 0.5)) 
+        {
+            inDecelZone = true;
+        } 
+        else if (trackShape.equals("Figure-Eight") && (progress >= 0.4 && progress < 0.5 || progress >= 0.8 && progress < 0.99)) 
+        {
+            inDecelZone = true;
+        }
+
+        if (inDecelZone) 
+        {
+            currentSpeed = Math.max(currentSpeed - acceleration*2, 0.5);
+        }
+        else 
+        {
+            double targetSpeed = 1.0 + (Math.random() * 4 * this.horseConfidence);
+            currentSpeed = Math.min(currentSpeed + acceleration, targetSpeed);
+        }
+        this.distanceTravelled += currentSpeed;
+
+        if (Math.random() < 0.0001 * Math.exp(this.horseConfidence)) {
+            this.hasFallen = true;
+        }
     }
+    
+    
 
  
     public int getX(int width, int height, String trackShape, int lane) 
@@ -586,7 +615,7 @@ class Horse
         
         if (trackShape.equals("Oval")) 
         {
-            double progress = this.distanceTravelled / this.trackLength;
+            progress = this.distanceTravelled / this.trackLength;
             progress = progress % 1.0; // Keep within 0-1 range
             int ovalWidth = width - 200;
             int ovalHeight = height - 100;
@@ -602,14 +631,14 @@ class Horse
         }
         else if (trackShape.equals("Straight")) 
         {
-            double progress = this.distanceTravelled / this.trackLength;
+            progress = this.distanceTravelled / this.trackLength;
             progress = progress % 1.0; 
             // Simple linear movement for straight track
             return 50 + (int)((width - 100) * progress);
         }
         else if(trackShape.equals("Figure-Eight"))
         {
-            double progress = (this.distanceTravelled / trackLength) % 1.0;
+            progress = (this.distanceTravelled / trackLength) % 1.0;
             double angle = progress * 2 * Math.PI;
 
             int laneOffset = lane * 40;
@@ -625,7 +654,7 @@ class Horse
         
         if (trackShape.equals("Oval")) 
         {
-            double progress = this.distanceTravelled / this.trackLength;
+            progress = this.distanceTravelled / this.trackLength;
             progress = progress % 1.0;
 
             int ovalWidth = width - 200;
@@ -640,14 +669,14 @@ class Horse
         }
         else if (trackShape.equals("Straight")) 
         {
-            double progress = this.distanceTravelled / this.trackLength;
+            progress = this.distanceTravelled / this.trackLength;
             progress = progress % 1.0;
             // Fixed Y position for each lane
             return 100 + (lane * 40);
         }  
         else if (trackShape.equals("Figure-Eight")) 
         {
-            double progress = (this.distanceTravelled / trackLength) % 1.0;
+            progress = (this.distanceTravelled / trackLength) % 1.0;
             double angle = progress * 2 * Math.PI + Math.PI/2;
 
             int laneOffset = lane * 40;
