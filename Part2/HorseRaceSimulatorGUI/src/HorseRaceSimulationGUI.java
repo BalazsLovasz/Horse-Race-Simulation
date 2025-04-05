@@ -87,12 +87,22 @@ class StartRaceGUI extends JFrame
         startRaceButton.setFont(new Font("Arial", Font.BOLD, 16));
         startRaceButton.setBackground(new Color(50, 150, 250)); // sets color to light blue
         startRaceButton.setForeground(Color.WHITE);
-        mainPanel.add(startRaceButton, BorderLayout.NORTH);
-
+        startRaceButton.setPreferredSize(new Dimension(200, 30));
+        startRaceButton.setMargin(new Insets(2, 5, 2, 5));
         
+        //Exit Button
+        exitButton = new JButton("Exit Race");
+        exitButton.addActionListener(new ExitButtonListener());
+        exitButton.setFont(new Font("Arial", Font.BOLD, 14));
+        exitButton.setBackground(new Color(200, 100, 100)); // Red color
+        exitButton.setForeground(Color.WHITE);
+        exitButton.setPreferredSize(new Dimension(100, 30));
+        exitButton.setMargin(new Insets(2, 5, 2, 5));
+        exitButton.setVisible(false); // Hidden until race starts
+
         // Restart Button
         restartButton = new JButton("Restart");
-        restartButton.addActionListener(new restartButtonListener());
+        restartButton.addActionListener(new RestartButtonListener());
         restartButton.setFont(new Font("Arial", Font.BOLD, 14));
         restartButton.setBackground(new Color(100, 200, 100));
         restartButton.setForeground(Color.WHITE);
@@ -104,6 +114,7 @@ class StartRaceGUI extends JFrame
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
         buttonPanel.add(startRaceButton);
         buttonPanel.add(restartButton);
+        buttonPanel.add(exitButton);
         mainPanel.add(buttonPanel, BorderLayout.NORTH);
 
         
@@ -216,6 +227,7 @@ class StartRaceGUI extends JFrame
             customisingPanel.setVisible(false);
             horsePanel.setVisible(false);
             startRaceButton.setVisible(false);
+            exitButton.setVisible(true);
 
             mainPanel.add(currentRacePanel, BorderLayout.CENTER);  // Adds the new track panel
 
@@ -224,7 +236,7 @@ class StartRaceGUI extends JFrame
             mainPanel.repaint();
          }
     }
-    private class restartButtonListener implements ActionListener
+    private class RestartButtonListener implements ActionListener
     {
         @Override
         public void actionPerformed(ActionEvent e) 
@@ -237,6 +249,27 @@ class StartRaceGUI extends JFrame
             currentRacePanel.resetRace();
             
             mainPanel.add(currentRacePanel, BorderLayout.CENTER);
+            mainPanel.revalidate();
+            mainPanel.repaint();
+        }
+    }
+
+    private class ExitButtonListener implements ActionListener 
+    {
+        @Override
+        public void actionPerformed(ActionEvent e) 
+        {
+            currentRacePanel.stopRace();
+
+            customisingPanel.setVisible(true);
+            horsePanel.setVisible(true);
+    
+            // 3. Reset button states
+            startRaceButton.setVisible(true);
+            restartButton.setVisible(false);
+            exitButton.setVisible(false);
+
+            mainPanel.remove(currentRacePanel);
             mainPanel.revalidate();
             mainPanel.repaint();
         }
@@ -268,224 +301,229 @@ class RaceTrackPanel extends JPanel
     }
 
 
-   public void resetRace() 
-   {
-       raceFinished = false;
-       if (raceTimer != null) 
-       {
-           raceTimer.stop();
-       }
-       raceTimer = new Timer(50, e -> updateRace());
-       raceTimer.start();
-   }
+    public void resetRace() 
+    {
+        raceFinished = false;
+        if (raceTimer != null) 
+        {
+            raceTimer.stop();
+        }
+        raceTimer = new Timer(50, e -> updateRace());
+        raceTimer.start();
+    }
 
-   private void updateRace() 
-   {
-       if(raceFinished)
-       {
-           return;
-       }
-       boolean allHorsesFallen = true;
-       Horse winner = null;
-       
-       for (Horse horse : horses) 
-       {
-           if (!horse.hasFallen()) 
-           {
-               allHorsesFallen = false; // At least one horse is still running
-               
-               if (horse.getDistanceTravelled() < trackLength) 
-               {
-                   horse.moveHorse();
-               } 
-               else 
-               {
-                   // Horse has finished the race
-                   raceFinished = true;
-                   winner = horse;
-               }
-           }
-       }
-       
-       // Check if all horses have fallen
-       if (allHorsesFallen) 
-       {
-           raceFinished = true;
-       }
-       
-       repaint();
-       
-       if (raceFinished) 
-       {
-           raceTimer.stop();
-           String message;
-           if (winner != null) 
-           {
-               message = "Race Over! And the winner is... " + winner.getName() + "!";
-           } 
-           else 
-           {
-               message = "Race Over! All horses have fallen!";
-           }
-           JOptionPane.showMessageDialog(this, message);
-       }
-   }
+    public void stopRace()
+        {
+            raceTimer.stop();
+        }
 
-   private String getWinningHorse() 
-   {
-       Horse winner = null;
-       for (Horse horse : horses) 
-       {
-           if (horse.getDistanceTravelled() >= trackLength) 
-           {
-               if (winner == null || horse.getDistanceTravelled() > winner.getDistanceTravelled()) 
-               {
-                   winner = horse;
-               }
-           }
-       }
-       return winner != null ? winner.getName() : "No winner";
-   }
+    private void updateRace() 
+    {
+        if(raceFinished)
+        {
+            return;
+        }
+        boolean allHorsesFallen = true;
+        Horse winner = null;
+        
+        for (Horse horse : horses) 
+        {
+            if (!horse.hasFallen()) 
+            {
+                allHorsesFallen = false; // At least one horse is still running
+                
+                if (horse.getDistanceTravelled() < trackLength) 
+                {
+                    horse.moveHorse();
+                } 
+                else 
+                {
+                    // Horse has finished the race
+                    raceFinished = true;
+                    winner = horse;
+                }
+            }
+        }
+        
+        // Check if all horses have fallen
+        if (allHorsesFallen) 
+        {
+            raceFinished = true;
+        }
+        
+        repaint();
+        
+        if (raceFinished) 
+        {
+            raceTimer.stop();
+            String message;
+            if (winner != null) 
+            {
+                message = "Race Over! And the winner is... " + winner.getName() + "!";
+            } 
+            else 
+            {
+                message = "Race Over! All horses have fallen!";
+            }
+            JOptionPane.showMessageDialog(this, message);
+        }
+    }
 
-   @Override
-   protected void paintComponent(Graphics g) {
-       super.paintComponent(g);
-       Graphics2D g2d = (Graphics2D) g;
-       
-       int width = getWidth();
-       int height = getHeight();
-       
-       g.setColor(Color.BLACK);
-       
-       if (trackShape.equals("Oval")) 
-       {
-           //drawing the ovals
-           for (int i = 0; i < laneCount; i++) 
-           {
-               int ovalWidth = width - 200 - (i * 80);
-               int ovalHeight = height - 100 - (i * 80);
-               g.drawOval(100 + (i * 40), 50 + (i * 40), ovalWidth, ovalHeight);
+    private String getWinningHorse() 
+    {
+        Horse winner = null;
+        for (Horse horse : horses) 
+        {
+            if (horse.getDistanceTravelled() >= trackLength) 
+            {
+                if (winner == null || horse.getDistanceTravelled() > winner.getDistanceTravelled()) 
+                {
+                    winner = horse;
+                }
+            }
+        }
+        return winner != null ? winner.getName() : "No winner";
+    }
 
-               // Draw horizontal red finish line (thick and spans all lanes)
-               g.setColor(Color.RED);
-               g.fillRect(100, height/2, i*40, 5);
-               g.setColor(Color.BLACK);
-           }
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
+        
+        int width = getWidth();
+        int height = getHeight();
+        
+        g.setColor(Color.BLACK);
+        
+        if (trackShape.equals("Oval")) 
+        {
+            //drawing the ovals
+            for (int i = 0; i < laneCount; i++) 
+            {
+                int ovalWidth = width - 200 - (i * 80);
+                int ovalHeight = height - 100 - (i * 80);
+                g.drawOval(100 + (i * 40), 50 + (i * 40), ovalWidth, ovalHeight);
 
-           // Draw horses
-           g.setColor(Color.BLACK);
-           for (int i = 0; i < laneCount; i++) 
-           {
-               Horse horse = horses[i];
-               int x = horse.getX(width, height, trackShape, i);
-               int y = horse.getY(width, height, trackShape, i);
-
-               if (horse.hasFallen()) 
-               {
-                   // Drawing a red "X" for fallen horses
-                   g2d.setColor(Color.RED);
-                   g2d.setStroke(new BasicStroke(3)); // Line thickness
-                   g2d.drawLine(x - 7, y - 9, x + 7, y + 9); // Diagonal \
-                   g2d.drawLine(x + 7, y - 9, x - 7, y + 9); // Diagonal /
-               } 
-               else
-               {
-                   g.setColor(Color.BLACK);
-                   g.drawString(String.valueOf(horse.getSymbol()), x, y);
-               }
-           }
-       }
-       else if (trackShape.equals("Figure-Eight")) 
-       {  
-           //drawing the track
-           for (int i = 0; i < laneCount; i++) 
-           {
-               int laneOffset = i * 40;
-               int resolution = 100; // Points to draw
-               int[] xPoints = new int[resolution];
-               int[] yPoints = new int[resolution];
-               
-               for (int j = 0; j < resolution; j++) 
-               {
-                   double t = 2 * Math.PI * j / resolution;
-                   double scale = (Math.min(width, height)/2) - laneOffset;
-                   xPoints[j] = (int) (width/2 + scale * Math.sin(t));
-                   yPoints[j] = (int) (height/2 + (scale/1.5) * Math.sin(t) * Math.cos(t));
-               }
-               g2d.drawPolyline(xPoints, yPoints, resolution);
-
-               // Drawing horizontal red finish line
-               int trackRadius = (int)(Math.min(width, height) * 0.4); // 40% of smallest dimension
-               int finishX = width/2 + trackRadius; // Rightmost point of track
-               int finishHeight = laneCount * 40;   // Span all lanes
-               
-               g2d.fillRect(
-                   finishX - 2,               // X position (center line)
-                   height/2 - finishHeight/2, // Y position (centered)
-                   4,                         // Line thickness
-                   finishHeight               // Height
-               );
-               g.setColor(Color.BLACK);
-           }
-
-           //drawing the horses
-           for (int i = 0; i < laneCount; i++) 
-           {
-               Horse horse = horses[i];
-               int x = horse.getX(width, height, trackShape, i);
-               int y = horse.getY(width, height, trackShape, i);
-               
-               if (horse.hasFallen()) 
-               {
-                   // Draw X
-                   g2d.setColor(Color.RED);
-                   g2d.setStroke(new BasicStroke(3));
-                   g2d.drawLine(x-7, y-9, x+7, y+9);
-                   g2d.drawLine(x+7, y-9, x-7, y+9);
-               } 
-               else 
-               {
-                   // Draw horse symbol
-                   g.setColor(Color.BLACK);
-                   g.drawString(String.valueOf(horse.getSymbol()), x, y);
-               }
-           }
-       } 
-       else if (trackShape.equals("Straight")) 
-       {
-           // Draw straight lanes
-           for (int i = 0; i < laneCount; i++) 
-           {
-               g.drawLine(50, 100+(i*40), width - 50, 100+(i*40));
-
-               // Draw horizontal red finish line (thick and spans all lanes)
-               g.setColor(Color.RED);
-               g.fillRect(width - 50, 100, 5, i*40);
-               g.setColor(Color.BLACK);
-           }
+                // Draw horizontal red finish line (thick and spans all lanes)
+                g.setColor(Color.RED);
+                g.fillRect(100, height/2, i*40, 5);
+                g.setColor(Color.BLACK);
+            }
 
             // Draw horses
-           g.setColor(Color.BLACK);
-           for (int i = 0; i < laneCount; i++) 
-           {
-               Horse horse = horses[i];
-               int x = horse.getX(width, height, trackShape, i);
-               int y = horse.getY(width, height, trackShape, i);
+            g.setColor(Color.BLACK);
+            for (int i = 0; i < laneCount; i++) 
+            {
+                Horse horse = horses[i];
+                int x = horse.getX(width, height, trackShape, i);
+                int y = horse.getY(width, height, trackShape, i);
 
-               if (horse.hasFallen()) 
-               {
-                   // Drawing a red "X" for fallen horses
-                   g2d.setColor(Color.RED);
-                   g2d.setStroke(new BasicStroke(3));
-                   g2d.drawLine(x-7, y-9, x+7, y+9);
-                   g2d.drawLine(x+7, y-9, x-7, y+9);
-               } 
-               else
-               {
-                   g.setColor(Color.BLACK);
-                   g.drawString(String.valueOf(horse.getSymbol()), x, y);
-               }
-           }
+                if (horse.hasFallen()) 
+                {
+                    // Drawing a red "X" for fallen horses
+                    g2d.setColor(Color.RED);
+                    g2d.setStroke(new BasicStroke(3)); // Line thickness
+                    g2d.drawLine(x - 7, y - 9, x + 7, y + 9); // Diagonal \
+                    g2d.drawLine(x + 7, y - 9, x - 7, y + 9); // Diagonal /
+                } 
+                else
+                {
+                    g.setColor(Color.BLACK);
+                    g.drawString(String.valueOf(horse.getSymbol()), x, y);
+                }
+            }
+        }
+        else if (trackShape.equals("Figure-Eight")) 
+        {  
+            //drawing the track
+            for (int i = 0; i < laneCount; i++) 
+            {
+                int laneOffset = i * 40;
+                int resolution = 100; // Points to draw
+                int[] xPoints = new int[resolution];
+                int[] yPoints = new int[resolution];
+                
+                for (int j = 0; j < resolution; j++) 
+                {
+                    double t = 2 * Math.PI * j / resolution;
+                    double scale = (Math.min(width, height)/2) - laneOffset;
+                    xPoints[j] = (int) (width/2 + scale * Math.sin(t));
+                    yPoints[j] = (int) (height/2 + (scale/1.5) * Math.sin(t) * Math.cos(t));
+                }
+                g2d.drawPolyline(xPoints, yPoints, resolution);
+
+                // Drawing horizontal red finish line
+                int trackRadius = (int)(Math.min(width, height) * 0.4); // 40% of smallest dimension
+                int finishX = width/2 + trackRadius; // Rightmost point of track
+                int finishHeight = laneCount * 40;   // Span all lanes
+                
+                g2d.fillRect(
+                    finishX - 2,               // X position (center line)
+                    height/2 - finishHeight/2, // Y position (centered)
+                    4,                         // Line thickness
+                    finishHeight               // Height
+                );
+                g.setColor(Color.BLACK);
+            }
+
+            //drawing the horses
+            for (int i = 0; i < laneCount; i++) 
+            {
+                Horse horse = horses[i];
+                int x = horse.getX(width, height, trackShape, i);
+                int y = horse.getY(width, height, trackShape, i);
+                
+                if (horse.hasFallen()) 
+                {
+                    // Draw X
+                    g2d.setColor(Color.RED);
+                    g2d.setStroke(new BasicStroke(3));
+                    g2d.drawLine(x-7, y-9, x+7, y+9);
+                    g2d.drawLine(x+7, y-9, x-7, y+9);
+                } 
+                else 
+                {
+                    // Draw horse symbol
+                    g.setColor(Color.BLACK);
+                    g.drawString(String.valueOf(horse.getSymbol()), x, y);
+                }
+            }
+        } 
+        else if (trackShape.equals("Straight")) 
+        {
+            // Draw straight lanes
+            for (int i = 0; i < laneCount; i++) 
+            {
+                g.drawLine(50, 100+(i*40), width - 50, 100+(i*40));
+
+                // Draw horizontal red finish line (thick and spans all lanes)
+                g.setColor(Color.RED);
+                g.fillRect(width - 50, 100, 5, i*40);
+                g.setColor(Color.BLACK);
+            }
+
+                // Draw horses
+            g.setColor(Color.BLACK);
+            for (int i = 0; i < laneCount; i++) 
+            {
+                Horse horse = horses[i];
+                int x = horse.getX(width, height, trackShape, i);
+                int y = horse.getY(width, height, trackShape, i);
+
+                if (horse.hasFallen()) 
+                {
+                    // Drawing a red "X" for fallen horses
+                    g2d.setColor(Color.RED);
+                    g2d.setStroke(new BasicStroke(3));
+                    g2d.drawLine(x-7, y-9, x+7, y+9);
+                    g2d.drawLine(x+7, y-9, x-7, y+9);
+                } 
+                else
+                {
+                    g.setColor(Color.BLACK);
+                    g.drawString(String.valueOf(horse.getSymbol()), x, y);
+                }
+            }
         }
         else if (trackShape.equals("Zig-Zag")) 
         {
@@ -495,25 +533,25 @@ class RaceTrackPanel extends JPanel
 }
  
  
- class Horse
- {
-     //instance variable set to private to improve security
-     private String horseName;
-     private char horseSymbol;
-     private double distanceTravelled;
-     private boolean hasFallen;
-     private double horseConfidence;
-     private  int trackLength;
- 
-     public Horse(char horseSymbol, String horseName, double horseConfidence, int trackLength) //constructor
-     {
-         this.horseName = horseName;
-         this.horseSymbol = horseSymbol;
-         this.horseConfidence = horseConfidence;
-         this.hasFallen = false;
-         this.distanceTravelled = 0;
-         this.trackLength = trackLength;
-     }
+class Horse
+{
+    //instance variable set to private to improve security
+    private String horseName;
+    private char horseSymbol;
+    private double distanceTravelled;
+    private boolean hasFallen;
+    private double horseConfidence;
+    private  int trackLength;
+
+    public Horse(char horseSymbol, String horseName, double horseConfidence, int trackLength) //constructor
+    {
+        this.horseName = horseName;
+        this.horseSymbol = horseSymbol;
+        this.horseConfidence = horseConfidence;
+        this.hasFallen = false;
+        this.distanceTravelled = 0;
+        this.trackLength = trackLength;
+    }
  
     
     public void moveHorse() 
