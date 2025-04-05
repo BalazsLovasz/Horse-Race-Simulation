@@ -354,8 +354,8 @@
                 g2d.drawPolyline(xPoints, yPoints, resolution);
 
                 // Drawing horizontal red finish line
-                g.setColor(Color.RED);
-                g.fillRect(width - 111, height/2, -i*40, 5);
+                g2d.setColor(Color.RED);                
+                g2d.fillOval(width/2 - 7,height/2 - 10, 15, 15);
                 g.setColor(Color.BLACK);
             }
 
@@ -456,7 +456,8 @@
             this.distanceTravelled += speed;
             
             // Reduce falling chance and make it more confidence-dependent
-            if (Math.random() < 0.001 * Math.exp(2 * this.horseConfidence)) {
+            if (Math.random() < 0.001 * Math.exp(this.horseConfidence)) 
+            {
                 this.hasFallen = true;
             }
         }
@@ -492,7 +493,7 @@
         else if(trackShape.equals("Figure-Eight"))
         {
             double progress = (this.distanceTravelled / trackLength) % 1.0;
-            double angle = progress * 2 * Math.PI + Math.PI/2;
+            double angle = progress * 2 * Math.PI;
 
             int laneOffset = lane * 40;
             double scale = (Math.min(width, height) / 2) - laneOffset;
@@ -530,7 +531,7 @@
         else if (trackShape.equals("Figure-Eight")) 
         {
             double progress = (this.distanceTravelled / trackLength) % 1.0;
-            double angle = progress * 2 * Math.PI ;
+            double angle = progress * 2 * Math.PI + Math.PI/2;
 
             int laneOffset = lane * 40;
             double scale = (Math.min(width, height) / 2) - laneOffset;
