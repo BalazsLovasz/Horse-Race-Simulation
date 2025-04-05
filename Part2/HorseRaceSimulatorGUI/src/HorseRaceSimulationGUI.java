@@ -221,18 +221,24 @@
         raceTimer.start();
      }
  
-     private void updateRaceOval() {
+     private void updateRaceOval() 
+     {
         boolean raceFinished = false;
         boolean allHorsesFallen = true;
         Horse winner = null;
         
-        for (Horse horse : horses) {
-            if (!horse.hasFallen()) {
+        for (Horse horse : horses) 
+        {
+            if (!horse.hasFallen()) 
+            {
                 allHorsesFallen = false; // At least one horse is still running
                 
-                if (horse.getDistanceTravelled() < trackLength) {
+                if (horse.getDistanceTravelled() < trackLength) 
+                {
                     horse.moveHorse();
-                } else {
+                } 
+                else 
+                {
                     // Horse has finished the race
                     raceFinished = true;
                     winner = horse;
@@ -241,29 +247,38 @@
         }
         
         // Check if all horses have fallen
-        if (allHorsesFallen) {
+        if (allHorsesFallen) 
+        {
             raceFinished = true;
         }
         
         repaint();
         
-        if (raceFinished) {
+        if (raceFinished) 
+        {
             raceTimer.stop();
             String message;
-            if (winner != null) {
+            if (winner != null) 
+            {
                 message = "Race Over! And the winner is... " + winner.getName() + "!";
-            } else {
+            } 
+            else 
+            {
                 message = "Race Over! All horses have fallen!";
             }
             JOptionPane.showMessageDialog(this, message);
         }
     }
  
-    private String getWinningHorse() {
+    private String getWinningHorse() 
+    {
         Horse winner = null;
-        for (Horse horse : horses) {
-            if (horse.getDistanceTravelled() >= trackLength) {
-                if (winner == null || horse.getDistanceTravelled() > winner.getDistanceTravelled()) {
+        for (Horse horse : horses) 
+        {
+            if (horse.getDistanceTravelled() >= trackLength) 
+            {
+                if (winner == null || horse.getDistanceTravelled() > winner.getDistanceTravelled()) 
+                {
                     winner = horse;
                 }
             }
@@ -280,38 +295,48 @@
         
         g.setColor(Color.BLACK);
         
-        if (trackShape.equals("Oval")) {
-            // Draw oval lanes
-            for (int i = 0; i < laneCount; i++) {
+        if (trackShape.equals("Oval")) 
+        {
+           
+            for (int i = 0; i < laneCount; i++) 
+            {
                 int ovalWidth = width - 200 - (i * 80);
                 int ovalHeight = height - 100 - (i * 80);
                 g.drawOval(100 + (i * 40), 50 + (i * 40), ovalWidth, ovalHeight);
-                
-                // Draw horse
+            }
+
+            // Draw red finish line
+            g.setColor(Color.RED);
+            g.fillRect(width - 150, height/2, laneCount*20, 5);
+
+             // Draw horses
+            g.setColor(Color.BLACK);
+            for (int i = 0; i < laneCount; i++) 
+            {
                 Horse horse = horses[i];
                 int x = horse.getX(width, height, laneCount, trackShape, i);
                 int y = horse.getY(width, height, laneCount, trackShape, i);
                 g.drawString(String.valueOf(horse.getSymbol()), x, y);
             }
         }
-         else if (trackShape.equals("Figure-Eight")) 
-         {  
-             int laneSpacing = 40; // Controls the gap between lanes
-             int ovalWidth = (width / 2) - 60; // Constant width of the ovals
-             int ovalHeight = height - 100;   // Constant height of the ovals
- 
-             
- 
-             for (int i = 0; i < laneCount; i++) {
-                 // Offset controls the spacing between each lane
-                 int offset = i * laneSpacing;
- 
-                 // Left oval (Loop 1) - Moves to the right
-                 g.drawOval(50 + offset, 50, ovalWidth, ovalHeight);
- 
-                 // Right oval (Loop 2) - Moves to the right 
-                 g.drawOval((width / 2) - 10 + offset, 50, ovalWidth, ovalHeight);
-             }
+        else if (trackShape.equals("Figure-Eight")) 
+        {  
+            int laneSpacing = 40; // Controls the gap between lanes
+            int ovalWidth = (width / 2) - 60; // Constant width of the ovals
+            int ovalHeight = height - 100;   // Constant height of the ovals
+
+            
+
+            for (int i = 0; i < laneCount; i++) {
+                // Offset controls the spacing between each lane
+                int offset = i * laneSpacing;
+
+                // Left oval (Loop 1) - Moves to the right
+                g.drawOval(50 + offset, 50, ovalWidth, ovalHeight);
+
+                // Right oval (Loop 2) - Moves to the right 
+                g.drawOval((width / 2) - 10 + offset, 50, ovalWidth, ovalHeight);
+            }
          }
  
          else if (trackShape.equals("Straight")) 
@@ -391,7 +416,7 @@
             // Simple linear movement for straight track
             return 50 + (int)((width - 100) * progress);
         }
-        // Add other track shapes here...
+        // Add other track shapes ?
         
         return 0;
     }
