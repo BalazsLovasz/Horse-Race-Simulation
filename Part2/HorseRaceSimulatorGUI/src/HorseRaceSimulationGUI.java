@@ -52,7 +52,7 @@
  
          //Choosing Track Length
          customisingPanel.add(new JLabel("Track Length (metres):"));
-         trackLength = new JTextField("100"); //making a default value of 100m
+         trackLength = new JTextField("200"); //making a default value of 200m
          customisingPanel.add(trackLength);
  
          //Choosing the number of lanes
@@ -303,11 +303,12 @@
                 int ovalWidth = width - 200 - (i * 80);
                 int ovalHeight = height - 100 - (i * 80);
                 g.drawOval(100 + (i * 40), 50 + (i * 40), ovalWidth, ovalHeight);
-            }
 
-            // Draw red finish line
-            g.setColor(Color.RED);
-            g.fillRect(width - 150, height/2, laneCount*20, 5);
+                // Draw horizontal red finish line (thick and spans all lanes)
+                g.setColor(Color.RED);
+                g.fillRect(width - 100, height/2, -i*40, 5);
+                g.setColor(Color.BLACK);
+            }
 
              // Draw horses
             g.setColor(Color.BLACK);
@@ -316,7 +317,19 @@
                 Horse horse = horses[i];
                 int x = horse.getX(width, height, laneCount, trackShape, i);
                 int y = horse.getY(width, height, laneCount, trackShape, i);
-                g.drawString(String.valueOf(horse.getSymbol()), x, y);
+
+                if (horse.hasFallen()) 
+                {
+                    // Drawing a red "X" for fallen horses
+                    g.setColor(Color.RED);
+                    g.drawLine(x - 7, y - 9, x + 7, y + 9); // Diagonal \
+                    g.drawLine(x + 7, y - 9, x - 7, y + 9); // Diagonal /
+                } 
+                else
+                {
+                    g.setColor(Color.BLACK);
+                    g.drawString(String.valueOf(horse.getSymbol()), x, y);
+                }
             }
         }
         else if (trackShape.equals("Figure-Eight")) 
@@ -384,11 +397,11 @@
         if (!this.hasFallen()) 
         {
             // Increase speed multiplier to make movement more visible
-            double speed = 1.0 + (Math.random() * 2 * this.horseConfidence);
+            double speed = 1.0 + (Math.random() * 4 * this.horseConfidence);
             this.horseDistance += speed;
             
             // Reduce falling chance and make it more confidence-dependent
-            if (Math.random() < (0.05 * (0.5 - this.horseConfidence/2))) {
+            if (Math.random() < 0.001 * Math.exp(2 * this.horseConfidence)) {
                 this.hasFallen = true;
             }
         }
