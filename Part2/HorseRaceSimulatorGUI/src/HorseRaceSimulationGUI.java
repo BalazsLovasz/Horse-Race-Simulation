@@ -83,10 +83,11 @@ class StartRaceGUI extends JFrame
         customisingPanel.add(trackShape);
 
         // Metrics display area 
-        metricsArea = new JTextArea(10, 30);
+        metricsArea = new JTextArea(15, 40);
         metricsArea.setEditable(false);
         metricsArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         metricsScrollPane = new JScrollPane(metricsArea);
+        metricsScrollPane.setPreferredSize(new Dimension(600, 200));
         metricsScrollPane.setVisible(false);
 
         //This panel is used to organise the horse panel and metrics panel
@@ -125,7 +126,7 @@ class StartRaceGUI extends JFrame
         restartButton.setVisible(false);
 
         //Performance metrics button
-        viewMetricsButton = new JButton("View Metrics");
+        viewMetricsButton = new JButton("Metrics");
         viewMetricsButton.addActionListener(new ViewMetricsButtonListener());
         viewMetricsButton.setFont(new Font("Arial", Font.BOLD, 14));
         viewMetricsButton.setBackground(new Color(128, 128, 128));
@@ -305,52 +306,54 @@ class StartRaceGUI extends JFrame
         }
     }
  
-    private class ViewMetricsButtonListener implements ActionListener {
+    private class ViewMetricsButtonListener implements ActionListener 
+    {
         @Override
-        public void actionPerformed(ActionEvent e) {
-            // Stop the race
-            currentRacePanel.stopRace();
-            
-            // Toggle metrics visibility
-            if (metricsScrollPane.isVisible()) {
+        public void actionPerformed(ActionEvent e) 
+        {
+            if (currentRacePanel.isPaused()) 
+            {
+                // Resume the race and hide metrics
+                currentRacePanel.resumeRace();
                 metricsScrollPane.setVisible(false);
-            } else {
-                // Calculate metrics
-                double duration = currentRacePanel.getRaceDuration();
-                if (duration < 0) {
-                    duration = (System.currentTimeMillis() - currentRacePanel.getStartTime()) / 1000.0;
-                }
+                viewMetricsButton.setText("Metrics");
                 
-                StringBuilder metricsMessage = new StringBuilder();
-                metricsMessage.append("Race Performance Metrics:\n\n");
-                metricsMessage.append(String.format("Track Length: %d meters\n", trackLengthInteger));
-                metricsMessage.append(String.format("Race Duration: %.2f seconds\n\n", duration));
+                revalidate();
+                repaint();
+            } 
+            else 
+            {
+                // Pauses the race and shows metrics
+                currentRacePanel.pauseRace();
+                
+                // Build metrics message
+                StringBuilder metrics = new StringBuilder();
+                metrics.append("=== Race Metrics ===\n\n");
+                metrics.append(String.format("Track: %s %dm | Lanes: %d\n\n", trackShapeString, trackLengthInteger, numberOfLanes));
                 
                 for (Horse horse : horses) {
-                    metricsMessage.append(String.format("Horse: %s\n", horse.getName()));
-                    double speed = (horse.getDistanceTravelled() / duration);
-                    metricsMessage.append(String.format("  Average Speed: %.2f m/s (%.2f km/h)\n", 
-                        speed, speed * 3.6));
-                    metricsMessage.append(String.format("  Confidence: %.2f\n", horse.getConfidence()));
-                    
-                    if (horse.getConfidenceHistory().size() > 1) {
-                        double change = horse.getConfidenceHistory().get(horse.getConfidenceHistory().size()-1) - 
-                                      horse.getConfidenceHistory().get(horse.getConfidenceHistory().size()-2);
-                        metricsMessage.append(String.format("  Confidence Change: %+.2f\n", change));
-                    }
-                    
-                    metricsMessage.append(String.format("  Distance Travelled: %.2f meters\n", horse.getDistanceTravelled()));
-                    metricsMessage.append(String.format("  Fell: %s\n\n", horse.hasFallen() ? "Yes" : "No"));
+                    metrics.append(String.format("%s:\n", horse.getName()));
+                    metrics.append(String.format("  %s\n", horse.getRaceStats()));
+                    metrics.append(String.format("  Current Confidence: %.2f\n", horse.getConfidence()));
+                    metrics.append(String.format("  Distance: %.1f/%dm %s\n\n",
+                        horse.getDistanceTravelled(), trackLengthInteger,
+                        horse.hasFallen() ? "(Fallen)" : ""));
                 }
                 
-                metricsArea.setText(metricsMessage.toString());
+                metricsArea.setText(metrics.toString());
                 metricsScrollPane.setVisible(true);
-                metricsArea.setCaretPosition(0);
+                viewMetricsButton.setText("Resume");
+                
+                // Make sure the panel has proper size
+                metricsScrollPane.setPreferredSize(new Dimension(
+                    getWidth() - 40, 
+                    Math.min(200, getHeight()/3)
+                ));
+                
+                // Force layout update
+                revalidate();
+                repaint();
             }
-            
-            // Force UI update
-            mainPanel.revalidate();
-            mainPanel.repaint();
         }
     }
 }
@@ -368,6 +371,8 @@ class RaceTrackPanel extends JPanel
     private long startTime;
     private long endTime;
     private boolean raceStarted;
+    private boolean isPaused;
+
 
     private ArrayList<Boolean> horseFellStatus = new ArrayList<>();
     private String winningHorseName;
@@ -381,9 +386,8 @@ class RaceTrackPanel extends JPanel
 
         this.raceFinished = false;
         this.raceStarted = false;
+        this.isPaused = false;
 
- 
- 
         // Timer to update horse positions
         raceTimer = new Timer(50, e -> {
             if (!raceStarted) 
@@ -404,6 +408,29 @@ class RaceTrackPanel extends JPanel
         
         long durationMillis = endTime - startTime;
         return durationMillis / 1000.0; // Convert to seconds with decimal
+    }
+
+    public void pauseRace() 
+    {
+        isPaused = true;
+        if (raceTimer != null) 
+        {
+            raceTimer.stop();
+        }
+    }
+    
+    public void resumeRace() 
+    {
+        isPaused = false;
+        if (raceTimer != null && !raceFinished) 
+        {
+            raceTimer.start();
+        }
+    }
+    
+    public boolean isPaused() 
+    {
+        return isPaused;
     }
  
     public long getStartTime() 
@@ -430,7 +457,7 @@ class RaceTrackPanel extends JPanel
 
     private void updateRace() 
     {
-        if(raceFinished)
+        if(isPaused || raceFinished)
         {
             return;
         }
@@ -482,6 +509,7 @@ class RaceTrackPanel extends JPanel
                 boolean won = horse.getName().equals(winningHorseName);
                 boolean fell = horse.hasFallen();
                 horse.updateConfidenceAfterRace(won, fell);
+                horse.recordRaceResult(won, fell);
             }
         }
             String message;
@@ -678,6 +706,9 @@ class Horse
 
     //metrics
     private ArrayList<Double> confidenceHistory = new ArrayList<>();
+    private int wins = 0;
+    private int fell = 0;
+    private int totalRaces = 0;
 
     public Horse(char horseSymbol, String horseName, double horseConfidence, int trackLength) //constructor
     {
@@ -697,28 +728,39 @@ class Horse
     return confidenceHistory;
     }
 
+    public void recordRaceResult(boolean won, boolean horseFell) 
+    {
+        totalRaces++;
+        if (won) wins++;
+        if (horseFell) fell++;
+    }
+
     public void updateConfidenceAfterRace(boolean wonRace, boolean fell) 
     {
-    double change;
-    if (wonRace) 
-    {
-        change = 0.1 * (1 - horseConfidence); // Bigger boost if confidence was low
-    } 
-    else if (fell) 
-    {
-        change = -0.15 * horseConfidence; // Bigger penalty if confidence was high
-    } 
-    else 
-    {
-        change = -0.05 * horseConfidence; // Small penalty for losing but not falling
+        double change;
+        if (wonRace) 
+        {
+            change = 0.1 * (1 - horseConfidence); // Bigger boost if confidence was low
+        } 
+        else if (fell) 
+        {
+            change = -0.15 * horseConfidence; // Bigger penalty if confidence was high
+        } 
+        else 
+        {
+            change = -0.05 * horseConfidence; // Small penalty for losing but not falling
+        }
+        
+        double newConfidence = Math.max(0, Math.min(1, horseConfidence + change));
+        confidenceHistory.add(newConfidence);
+        horseConfidence = newConfidence;
     }
-    
-    double newConfidence = Math.max(0, Math.min(1, horseConfidence + change));
-    confidenceHistory.add(newConfidence);
-    horseConfidence = newConfidence;
-}
 
-
+    public String getRaceStats() {
+        return String.format("Races: %d | Won: %d | Fell: %d | Win Rate: %.1f%%",
+                        totalRaces, wins, fell,
+                        (wins * 100.0) / totalRaces);
+    }
     
     public void moveHorse(String trackShape) 
     {
