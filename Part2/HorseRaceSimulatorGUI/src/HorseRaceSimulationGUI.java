@@ -13,6 +13,8 @@ import javax.swing.*;
 import java.util.ArrayList;
 import javax.security.auth.Refreshable;
 import javax.swing.plaf.ColorUIResource;
+import javax.swing.JTabbedPane;
+
 
 class StartRaceGUI extends JFrame 
 {
@@ -23,7 +25,9 @@ class StartRaceGUI extends JFrame
     private JComboBox<String> weatherCondition;
     private JComboBox<String> trackShape;
 
-    private Horse[] horses;
+    //to do with horses
+    private Horse[] horses = new Horse[5]; // Max 5 horses
+    private ArrayList<Horse> allHorses = new ArrayList<>(); // this stores horses that have ever raced
     private JTextField[] horseNames = new JTextField[5];
     private JTextField[] horseSymbols = new JTextField[5];
     private JTextField[] horseConfidences = new JTextField[5];
@@ -36,6 +40,8 @@ class StartRaceGUI extends JFrame
     private RaceTrackPanel currentRacePanel;
     private JTextArea metricsArea;
     private JScrollPane metricsScrollPane;
+    private JTabbedPane metricsTabs;
+    private JPanel metricsPanel;
 
     public StartRaceGUI()
     {
@@ -83,17 +89,15 @@ class StartRaceGUI extends JFrame
         customisingPanel.add(trackShape);
 
         // Metrics display area 
-        metricsArea = new JTextArea(15, 40);
-        metricsArea.setEditable(false);
-        metricsArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        metricsScrollPane = new JScrollPane(metricsArea);
-        metricsScrollPane.setPreferredSize(new Dimension(600, 200));
-        metricsScrollPane.setVisible(false);
+        metricsPanel = new JPanel(new BorderLayout());
+        metricsTabs = new JTabbedPane();
+        metricsPanel.add(metricsTabs, BorderLayout.CENTER);
+        metricsPanel.setVisible(false);
 
         //This panel is used to organise the horse panel and metrics panel
         JPanel southPanel = new JPanel(new BorderLayout());
         southPanel.add(horsePanel, BorderLayout.NORTH);
-        southPanel.add(metricsScrollPane, BorderLayout.SOUTH);
+        southPanel.add(metricsPanel, BorderLayout.SOUTH);
         add(southPanel, BorderLayout.SOUTH);
 
         //Start Button
@@ -165,29 +169,29 @@ class StartRaceGUI extends JFrame
         horsePanel.removeAll();
         int numLanes = Integer.parseInt((String) laneCountList.getSelectedItem());
 
-        //adds the JTextFields to the horse panel
         for (int i = 0; i < numLanes; i++) 
         {
-            horsePanel.add(new JLabel("Horse " + (i + 1) + " Name:")); //name
-            horseNames[i] = new JTextField("Horse" + (i + 1));
+            horsePanel.add(new JLabel("Horse " + (i + 1) + " Name:"));
+            // Only set default if no existing horse
+            String defaultName = (i < horses.length && horses[i] != null) ? horses[i].getName() : "Horse" + (i + 1);
+            horseNames[i] = new JTextField(defaultName);
             horsePanel.add(horseNames[i]);
 
-            horsePanel.add(new JLabel("Horse " + (i + 1) + " Symbol:")); //symbol(a character)
-            horseSymbols[i] = new JTextField("#");
+            horsePanel.add(new JLabel("Horse " + (i + 1) + " Symbol:"));
+            char defaultSymbol = (i < horses.length && horses[i] != null) ? horses[i].getSymbol() : '#';
+            horseSymbols[i] = new JTextField(String.valueOf(defaultSymbol));
             horsePanel.add(horseSymbols[i]);
 
-            horsePanel.add(new JLabel("Horse " + (i + 1) + " Confidence:")); //confidence
-            horseConfidences[i] = new JTextField("0.5");
+            horsePanel.add(new JLabel("Horse " + (i + 1) + " Confidence:"));
+            double defaultConfidence = (i < horses.length && horses[i] != null) ? horses[i].getConfidence() : 0.5;
+            horseConfidences[i] = new JTextField(String.valueOf(defaultConfidence));
             horsePanel.add(horseConfidences[i]);
         }
 
-        //refreshes the panel
         horsePanel.revalidate();
         horsePanel.repaint();
-
-        trackShapeString = (String) trackShape.getSelectedItem(); //Get the user input values
-        numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem()); // Get the user input values
-
+        trackShapeString = (String) trackShape.getSelectedItem();
+        numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem());
     }
 
     // Action Listener for "Start Race" button
@@ -196,6 +200,9 @@ class StartRaceGUI extends JFrame
         @Override
         public void actionPerformed(ActionEvent e) 
         {
+            metricsPanel.setVisible(false);
+            viewMetricsButton.setText("Metrics");
+
             trackLengthInteger = 0;
             try
             {
@@ -215,32 +222,54 @@ class StartRaceGUI extends JFrame
             weatherConditionString =(String) weatherCondition.getSelectedItem(); // Get the user input values
             trackShapeString = (String) trackShape.getSelectedItem(); // Get the user input values
             
-            //Stores the number of horses in the race
-            horses = new Horse[numberOfLanes];
+            Horse[] oldHorses = horses != null ? horses.clone() : new Horse[0];
+            Horse[] newHorses = new Horse[numberOfLanes];
 
-            // Adding horses based on selected number of lanes
             for (int i = 0; i < numberOfLanes; i++) 
             {
                 String horseName = horseNames[i].getText();
                 char horseSymbol = horseSymbols[i].getText().charAt(0);
                 double confidence = 0.5;
-                int radius = 80 + (i * 20); // Different lane distances
 
-                try
-                {
+                try {
                     confidence = Double.parseDouble(horseConfidences[i].getText());
-                    if (confidence < 0 || confidence > 1)
-                    {
+                    if (confidence < 0 || confidence > 1) {
                         throw new IllegalArgumentException("Confidence must be between 0 and 1");
                     }
-                }
-                catch (IllegalArgumentException ex)
-                {
+                } catch (IllegalArgumentException ex) {
                     JOptionPane.showMessageDialog(null, "Please enter a valid confidence value between 0 and 1!", "Error", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
-                horses[i] = new Horse(horseSymbol, horseName, confidence, trackLengthInteger);
+
+                Horse existingHorse = null;
+                for (Horse h : allHorses) 
+                {
+                    if (h.getName().equals(horseName)) 
+                    {
+                        existingHorse = h;
+                        break;
+                    }
+                }
+                
+                if (existingHorse != null) 
+                {
+                    // Update existing horse properties
+                    existingHorse.setSymbol(horseSymbol);
+                    existingHorse.setConfidence(confidence);
+                    existingHorse.goBackToStart();
+                    newHorses[i] = existingHorse;
+                } 
+                else 
+                {
+                    // Create new horse and add to history
+                    Horse newHorse = new Horse(horseSymbol, horseName, confidence, trackLengthInteger);
+                    newHorses[i] = newHorse;
+                    allHorses.add(newHorse);
+                }
             }
+            
+            horses = newHorses;
+            
             //hide the customising panles
             horsePanel.setVisible(false);
             customisingPanel.setVisible(false);
@@ -269,10 +298,19 @@ class StartRaceGUI extends JFrame
         @Override
         public void actionPerformed(ActionEvent e) 
         {
-
-            for(int i = 0; i<horses.length; i++)
+            if (metricsPanel.isVisible()) 
             {
-                horses[i].goBackToStart();
+                metricsPanel.setVisible(false);
+                viewMetricsButton.setText("Metrics");
+                currentRacePanel.resumeRace(); // Ensure race resumes if paused for metrics
+            }
+
+            for(int i = 0; i < horses.length; i++) 
+            {
+                if (horses[i] != null) 
+                {
+                    horses[i].goBackToStart();
+                }
             }
             currentRacePanel.resetRace();
 
@@ -290,70 +328,141 @@ class StartRaceGUI extends JFrame
         {
             currentRacePanel.stopRace();
 
-            customisingPanel.setVisible(true);
-            horsePanel.setVisible(true);
+            metricsPanel.setVisible(false);
+            viewMetricsButton.setText("Metrics");
     
             // 3. Reset button states
+            customisingPanel.setVisible(true);
+            horsePanel.setVisible(true);
             startRaceButton.setVisible(true);
             restartButton.setVisible(false);
             exitButton.setVisible(false);
             viewMetricsButton.setVisible(false);
-
-
+            
             mainPanel.remove(currentRacePanel);
             mainPanel.revalidate();
             mainPanel.repaint();
+
+            updateHorseInputs();
         }
     }
  
-    private class ViewMetricsButtonListener implements ActionListener 
-    {
+    private class ViewMetricsButtonListener implements ActionListener {
         @Override
-        public void actionPerformed(ActionEvent e) 
-        {
-            if (currentRacePanel.isPaused()) 
-            {
-                // Resume the race and hide metrics
+        public void actionPerformed(ActionEvent e) {
+            if (currentRacePanel.isPaused()) {
                 currentRacePanel.resumeRace();
-                metricsScrollPane.setVisible(false);
+                metricsPanel.setVisible(false);
                 viewMetricsButton.setText("Metrics");
-                
-                revalidate();
-                repaint();
-            } 
-            else 
-            {
-                // Pauses the race and shows metrics
+            } else {
                 currentRacePanel.pauseRace();
+                metricsTabs.removeAll();
                 
-                // Build metrics message
-                StringBuilder metrics = new StringBuilder();
-                metrics.append("=== Race Metrics ===\n\n");
-                metrics.append(String.format("Track: %s %dm | Lanes: %d\n\n", trackShapeString, trackLengthInteger, numberOfLanes));
+                // Tab 1: Current Race - Detailed current status
+                JTextArea currentRaceArea = createMetricsTextArea();
+                currentRaceArea.append("=== CURRENT RACE DETAILS ===\n\n");
+                currentRaceArea.append(String.format("Track: %-12s %4dm | Lanes: %d | Weather: %s\n\n",
+                    trackShapeString, trackLengthInteger, numberOfLanes, weatherConditionString));
                 
-                for (Horse horse : horses) {
-                    metrics.append(String.format("%s:\n", horse.getName()));
-                    metrics.append(String.format("  %s\n", horse.getRaceStats()));
-                    metrics.append(String.format("  Current Confidence: %.2f\n", horse.getConfidence()));
-                    metrics.append(String.format("  Distance: %.1f/%dm %s\n\n",
-                        horse.getDistanceTravelled(), trackLengthInteger,
-                        horse.hasFallen() ? "(Fallen)" : ""));
+                for (int i = 0; i < horses.length; i++) {
+                    if (horses[i] != null) {
+                        Horse horse = horses[i];
+                        currentRaceArea.append(String.format("Lane %d: %s\n", i+1, horse.getName()));
+                        currentRaceArea.append(String.format("  Symbol: %c | Confidence: %.2f\n", 
+                            horse.getSymbol(), horse.getConfidence()));
+                        currentRaceArea.append(String.format("  Distance: %5.1f/%dm | Status: %s\n",
+                            horse.getDistanceTravelled(), trackLengthInteger,
+                            horse.hasFallen() ? "FALLEN" : "RACING"));
+                        
+                        // Add estimated time to complete if available
+                        if (currentRacePanel.getRaceDuration() > 0) {
+                            currentRaceArea.append(String.format("  Current Time: %.2fs\n", 
+                                currentRacePanel.getRaceDuration()));
+                        }
+                        currentRaceArea.append("\n");
+                    }
                 }
+                metricsTabs.addTab("Current Race", new JScrollPane(currentRaceArea));
                 
-                metricsArea.setText(metrics.toString());
-                metricsScrollPane.setVisible(true);
+                // Tab 2: Lifetime Stats - Comprehensive historical data
+                JTextArea lifetimeStatsArea = createMetricsTextArea();
+                lifetimeStatsArea.append("=== LIFETIME HORSE STATISTICS ===\n\n");
+                
+                // Sort by most races first
+                allHorses.sort((h1, h2) -> Integer.compare(h2.getTotalRaces(), h1.getTotalRaces()));
+                
+                for (Horse horse : allHorses) {
+                    lifetimeStatsArea.append(String.format("%s (Symbol: %c):\n", 
+                        horse.getName(), horse.getSymbol()));
+                    lifetimeStatsArea.append(String.format("  Races: %3d | Wins: %3d (%.1f%%) | Falls: %2d\n",
+                        horse.getTotalRaces(),
+                        horse.getWins(),
+                        horse.getTotalRaces() > 0 ? (horse.getWins() * 100.0) / horse.getTotalRaces() : 0,
+                        horse.getFalls()));
+                    
+                    // Detailed confidence history
+                    if (!horse.getConfidenceHistory().isEmpty()) {
+                        ArrayList<Double> history = horse.getConfidenceHistory();
+                        double first = history.get(0);
+                        double last = history.get(history.size()-1);
+                        double highest = history.stream().max(Double::compare).orElse(first);
+                        double lowest = history.stream().min(Double::compare).orElse(first);
+                        
+                        lifetimeStatsArea.append(String.format("  Confidence: %.2f → %.2f (%s)\n",
+                            first, last,
+                            last > first ? "↑ Improved" : last < first ? "↓ Declined" : "→ Stable"));
+                        lifetimeStatsArea.append(String.format("  Range: %.2f (Low) to %.2f (High)\n",
+                            lowest, highest));
+                    }
+                    lifetimeStatsArea.append("\n");
+                }
+                metricsTabs.addTab("Lifetime Stats", new JScrollPane(lifetimeStatsArea));
+                
+                // Tab 3: Performance Records - Using your timing data
+                JTextArea recordsArea = createMetricsTextArea();
+                recordsArea.append("=== PERFORMANCE RECORDS ===\n\n");
+                
+                // Fastest races
+                recordsArea.append("Fastest Completed Races:\n");
+                for (Horse horse : allHorses) {
+                    if (horse.getFastestTime() > 0) {
+                        recordsArea.append(String.format("  %s: %.2fs (%s track)\n",
+                            horse.getName(),
+                            horse.getFastestTime(),
+                            horse.getFastestTrackType()));
+                    }
+                }
+                recordsArea.append("\n");
+                
+                // Best performers by track type
+                recordsArea.append("Best Win Rates by Track:\n");
+                // You could add your method here to get best performers per track type
+                recordsArea.append("  Oval: " + getBestPerformerByTrack("Oval") + "\n");
+                recordsArea.append("  Straight: " + getBestPerformerByTrack("Straight") + "\n");
+                recordsArea.append("  Figure-Eight: " + getBestPerformerByTrack("Figure-Eight") + "\n");
+                
+                metricsTabs.addTab("Performance", new JScrollPane(recordsArea));
+                
+                metricsPanel.setVisible(true);
                 viewMetricsButton.setText("Resume");
-                
-                // Make sure the panel has proper size
-                metricsScrollPane.setPreferredSize(new Dimension(
-                    getWidth() - 40, 
-                    Math.min(200, getHeight()/3)
-                ));
-                
-                // Force layout update
+                metricsPanel.setPreferredSize(new Dimension(getWidth() - 40, 350));
                 revalidate();
                 repaint();
             }
+        }
+        
+        // Helper method to get best performer by track type
+        private String getBestPerformerByTrack(String trackType) {
+            // Implement your logic using your timing data
+            return "Implement using your race timing methods";
+        }
+        
+        private JTextArea createMetricsTextArea() {
+            JTextArea textArea = new JTextArea();
+            textArea.setEditable(false);
+            textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+            textArea.setMargin(new Insets(10, 10, 10, 10));
+            return textArea;
         }
     }
 }
@@ -484,18 +593,19 @@ class RaceTrackPanel extends JPanel
             }
         }
         
-    // Check if all horses have fallen
-    if (allHorsesFallen) 
-    {
-        raceFinished = true;
-        endTime = System.currentTimeMillis(); // the end time
-    }
+        // Check if all horses have fallen
+        if (allHorsesFallen) 
+        {
+            raceFinished = true;
+            endTime = System.currentTimeMillis(); // the end time
+        }
         
         repaint();
         
         if (raceFinished) 
         {
             raceTimer.stop();
+            double raceDuration = getRaceDuration();
             horseFellStatus.clear();
             for (Horse horse : horses) 
             {
@@ -503,15 +613,16 @@ class RaceTrackPanel extends JPanel
             }
             if (winner != null) 
             {
-            winningHorseName = winner.getName();
-            for (Horse horse : horses) 
-            {
-                boolean won = horse.getName().equals(winningHorseName);
-                boolean fell = horse.hasFallen();
-                horse.updateConfidenceAfterRace(won, fell);
-                horse.recordRaceResult(won, fell);
+                winningHorseName = winner.getName();
+                for (Horse horse : horses) 
+                {
+                    boolean won = horse.getName().equals(winningHorseName);
+                    boolean fell = horse.hasFallen();
+                    horse.recordRaceCompletion(raceDuration, trackShape);
+                    horse.updateConfidenceAfterRace(won, fell);
+                    horse.recordRaceResult(won, fell);
+                }
             }
-        }
             String message;
             if (winner != null) 
             {
@@ -709,6 +820,8 @@ class Horse
     private int wins = 0;
     private int fell = 0;
     private int totalRaces = 0;
+    private double fastestTime = Double.MAX_VALUE; // Initialize with very high value
+    private String fastestTrackType = "N/A";
 
     public Horse(char horseSymbol, String horseName, double horseConfidence, int trackLength) //constructor
     {
@@ -725,7 +838,27 @@ class Horse
 
     public ArrayList<Double> getConfidenceHistory() 
     {
-    return confidenceHistory;
+        return confidenceHistory;
+    }
+
+    public void recordRaceCompletion(double time, String trackType) 
+    {
+        if (time < fastestTime) 
+        {
+            this.fastestTime = time;
+            this.fastestTrackType = trackType;
+        }
+        totalRaces++;
+    }
+    
+    public double getFastestTime() 
+    {
+        return fastestTime == Double.MAX_VALUE ? 0 : fastestTime;
+    }
+    
+    public String getFastestTrackType() 
+    {
+        return fastestTrackType;
     }
 
     public void recordRaceResult(boolean won, boolean horseFell) 
@@ -760,6 +893,21 @@ class Horse
         return String.format("Races: %d | Won: %d | Fell: %d | Win Rate: %.1f%%",
                         totalRaces, wins, fell,
                         (wins * 100.0) / totalRaces);
+    }
+
+    public int getTotalRaces()
+    {
+        return this.totalRaces;
+    }
+
+    public int getWins()
+    {
+        return this.wins;
+    }
+
+    public int getFalls()
+    {
+        return this.fell;
     }
     
     public void moveHorse(String trackShape) 
