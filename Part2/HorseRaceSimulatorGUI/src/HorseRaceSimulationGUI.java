@@ -18,7 +18,7 @@ class StartRaceGUI extends JFrame
  {
      private JPanel customisingPanel, raceDisplayPanel, mainPanel, horsePanel;
      private JTextField trackLength;
-     private JButton startRaceButton, restartButton, exitButton;
+     private JButton startRaceButton, restartButton, exitButton, viewMetricsButton;
      private JComboBox<String> laneCountList;
      private JComboBox<String> weatherCondition;
      private JComboBox<String> trackShape;
@@ -110,11 +110,22 @@ class StartRaceGUI extends JFrame
         restartButton.setMargin(new Insets(2, 5, 2, 5));
         restartButton.setVisible(false);
 
+        //Performance metrics button
+        viewMetricsButton = new JButton("View Metrics");
+        viewMetricsButton.addActionListener(new RestartButtonListener());
+        viewMetricsButton.setFont(new Font("Arial", Font.BOLD, 14));
+        viewMetricsButton.setBackground(new Color(128, 128, 128));
+        viewMetricsButton.setForeground(Color.WHITE);
+        viewMetricsButton.setPreferredSize(new Dimension(100, 30)); // Smaller than start button
+        viewMetricsButton.setMargin(new Insets(2, 5, 2, 5));
+        viewMetricsButton.setVisible(false);
+
         // Container panel for proper positioning
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
         buttonPanel.add(startRaceButton);
         buttonPanel.add(restartButton);
         buttonPanel.add(exitButton);
+        buttonPanel.add(viewMetricsButton);
         mainPanel.add(buttonPanel, BorderLayout.NORTH);
 
         
@@ -223,11 +234,13 @@ class StartRaceGUI extends JFrame
             currentRacePanel = new RaceTrackPanel(trackShapeString, numberOfLanes, horses, trackLengthInteger);
 
             // this updates the race display panel
-            restartButton.setVisible(true);
             customisingPanel.setVisible(false);
             horsePanel.setVisible(false);
             startRaceButton.setVisible(false);
+            restartButton.setVisible(true);
             exitButton.setVisible(true);
+            viewMetricsButton.setVisible(true);
+
 
             mainPanel.add(currentRacePanel, BorderLayout.CENTER);  // Adds the new track panel
 
@@ -269,6 +282,8 @@ class StartRaceGUI extends JFrame
             startRaceButton.setVisible(true);
             restartButton.setVisible(false);
             exitButton.setVisible(false);
+            viewMetricsButton.setVisible(false);
+
 
             mainPanel.remove(currentRacePanel);
             mainPanel.revalidate();
@@ -336,8 +351,7 @@ class RaceTrackPanel extends JPanel
                 
                 if (horse.getDistanceTravelled() < trackLength) 
                 {
-                    horse.moveHorse();
-                    horse.deccelerateHorse(trackShape);
+                    horse.moveHorse(trackShape);
                 } 
                 else 
                 {
@@ -410,6 +424,10 @@ class RaceTrackPanel extends JPanel
                 // Draw horizontal red finish line (thick and spans all lanes)
                 g.setColor(Color.RED);
                 g.fillRect(100, height/2, i*40, 5);
+
+                //Draw horizontal green start line
+                g.setColor(Color.GREEN);
+                g.fillRect(100, height/2+5, i*40, 5);
                 g.setColor(Color.BLACK);
             }
 
@@ -494,6 +512,10 @@ class RaceTrackPanel extends JPanel
                 // Draw horizontal red finish line (thick and spans all lanes)
                 g.setColor(Color.RED);
                 g.fillRect(width - 50, 100, 5, i*40);
+
+                // Draw horizontal green start line
+                g.setColor(Color.GREEN);
+                g.fillRect(50, 100, 5, i*40);
                 g.setColor(Color.BLACK);
             }
 
@@ -556,28 +578,7 @@ class Horse
     }
  
     
-    public void moveHorse() 
-    {
-        if (!this.hasFallen()) 
-        {
-            // Increase speed multiplier to make movement more visible
-            double targetSpeed = 1.0 + (Math.random() * 4 * this.horseConfidence);
-
-            if (currentSpeed < targetSpeed) 
-            {
-                currentSpeed = Math.min(currentSpeed + acceleration, targetSpeed);
-            }
-            this.distanceTravelled += currentSpeed;
-            
-            // Reduce falling chance and make it more confidence-dependent
-            if (Math.random() < 0.0001 * Math.exp(this.horseConfidence)) 
-            {
-                this.hasFallen = true;
-            }
-        }
-    }
-    
-    public void deccelerateHorse(String trackShape)
+    public void moveHorse(String trackShape) 
     {
         boolean inDecelZone = false;
 
@@ -586,27 +587,27 @@ class Horse
         {
             inDecelZone = true;
         } 
-        else if (trackShape.equals("Figure-Eight") && (progress >= 0.4 && progress < 0.5 || progress >= 0.8 && progress < 0.99)) 
+        else if (trackShape.equals("Figure-Eight") && (progress >= 0.45 && progress < 0.5 || progress >= 0.93 && progress < 0.99)) 
         {
             inDecelZone = true;
         }
 
         if (inDecelZone) 
         {
-            currentSpeed = Math.max(currentSpeed - acceleration*2, 0.5);
+            currentSpeed = Math.max(currentSpeed - acceleration*2, this.horseConfidence);
         }
         else 
         {
-            double targetSpeed = 1.0 + (Math.random() * 4 * this.horseConfidence);
+            double targetSpeed = 1.0 + (Math.random() * 8 * this.horseConfidence);
             currentSpeed = Math.min(currentSpeed + acceleration, targetSpeed);
         }
         this.distanceTravelled += currentSpeed;
 
-        if (Math.random() < 0.0001 * Math.exp(this.horseConfidence)) {
+        if (Math.random() < 0.0001 * Math.exp(this.horseConfidence)) 
+        {
             this.hasFallen = true;
         }
     }
-    
     
 
  
