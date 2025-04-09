@@ -8,12 +8,11 @@
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.concurrent.TimeUnit;
-import javax.swing.*;
+import java.io.*;
 import java.util.ArrayList;
-import javax.security.auth.Refreshable;
-import javax.swing.plaf.ColorUIResource;
-import javax.swing.JTabbedPane;
+import java.util.HashMap;
+import java.util.Map;
+import javax.swing.*;
 
 
 class StartRaceGUI extends JFrame 
@@ -50,6 +49,7 @@ class StartRaceGUI extends JFrame
         setSize(800,600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
+
 
         //this panel will have the race running and the button (helps with display)
         // to wrap button and race panel
@@ -287,6 +287,7 @@ class StartRaceGUI extends JFrame
 
 
             mainPanel.add(currentRacePanel, BorderLayout.CENTER);  // Adds the new track panel
+            currentRacePanel.resetRace();
 
             // Refresh the race display panel
             mainPanel.revalidate();
@@ -304,14 +305,7 @@ class StartRaceGUI extends JFrame
                 viewMetricsButton.setText("Metrics");
                 currentRacePanel.resumeRace(); // Ensure race resumes if paused for metrics
             }
-
-            for(int i = 0; i < horses.length; i++) 
-            {
-                if (horses[i] != null) 
-                {
-                    horses[i].goBackToStart();
-                }
-            }
+            
             currentRacePanel.resetRace();
 
             mainPanel.remove(currentRacePanel);
@@ -350,122 +344,11 @@ class StartRaceGUI extends JFrame
     private class ViewMetricsButtonListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            if (currentRacePanel.isPaused()) {
-                currentRacePanel.resumeRace();
-                metricsPanel.setVisible(false);
-                viewMetricsButton.setText("Metrics");
-            } else {
-                currentRacePanel.pauseRace();
-                metricsTabs.removeAll();
-                
-                // Tab 1: Current Race - Detailed current status
-                JTextArea currentRaceArea = createMetricsTextArea();
-                currentRaceArea.append("=== CURRENT RACE DETAILS ===\n\n");
-                currentRaceArea.append(String.format("Track: %-12s %4dm | Lanes: %d | Weather: %s\n\n",
-                    trackShapeString, trackLengthInteger, numberOfLanes, weatherConditionString));
-                
-                for (int i = 0; i < horses.length; i++) {
-                    if (horses[i] != null) {
-                        Horse horse = horses[i];
-                        currentRaceArea.append(String.format("Lane %d: %s\n", i+1, horse.getName()));
-                        currentRaceArea.append(String.format("  Symbol: %c | Confidence: %.2f\n", 
-                            horse.getSymbol(), horse.getConfidence()));
-                        currentRaceArea.append(String.format("  Distance: %5.1f/%dm | Status: %s\n",
-                            horse.getDistanceTravelled(), trackLengthInteger,
-                            horse.hasFallen() ? "FALLEN" : "RACING"));
-                        
-                        // Add estimated time to complete if available
-                        if (currentRacePanel.getRaceDuration() > 0) {
-                            currentRaceArea.append(String.format("  Current Time: %.2fs\n", 
-                                currentRacePanel.getRaceDuration()));
-                        }
-                        currentRaceArea.append("\n");
-                    }
-                }
-                metricsTabs.addTab("Current Race", new JScrollPane(currentRaceArea));
-                
-                // Tab 2: Lifetime Stats - Comprehensive historical data
-                JTextArea lifetimeStatsArea = createMetricsTextArea();
-                lifetimeStatsArea.append("=== LIFETIME HORSE STATISTICS ===\n\n");
-                
-                // Sort by most races first
-                allHorses.sort((h1, h2) -> Integer.compare(h2.getTotalRaces(), h1.getTotalRaces()));
-                
-                for (Horse horse : allHorses) {
-                    lifetimeStatsArea.append(String.format("%s (Symbol: %c):\n", 
-                        horse.getName(), horse.getSymbol()));
-                    lifetimeStatsArea.append(String.format("  Races: %3d | Wins: %3d (%.1f%%) | Falls: %2d\n",
-                        horse.getTotalRaces(),
-                        horse.getWins(),
-                        horse.getTotalRaces() > 0 ? (horse.getWins() * 100.0) / horse.getTotalRaces() : 0,
-                        horse.getFalls()));
-                    
-                    // Detailed confidence history
-                    if (!horse.getConfidenceHistory().isEmpty()) {
-                        ArrayList<Double> history = horse.getConfidenceHistory();
-                        double first = history.get(0);
-                        double last = history.get(history.size()-1);
-                        double highest = history.stream().max(Double::compare).orElse(first);
-                        double lowest = history.stream().min(Double::compare).orElse(first);
-                        
-                        lifetimeStatsArea.append(String.format("  Confidence: %.2f → %.2f (%s)\n",
-                            first, last,
-                            last > first ? "↑ Improved" : last < first ? "↓ Declined" : "→ Stable"));
-                        lifetimeStatsArea.append(String.format("  Range: %.2f (Low) to %.2f (High)\n",
-                            lowest, highest));
-                    }
-                    lifetimeStatsArea.append("\n");
-                }
-                metricsTabs.addTab("Lifetime Stats", new JScrollPane(lifetimeStatsArea));
-                
-                // Tab 3: Performance Records - Using your timing data
-                JTextArea recordsArea = createMetricsTextArea();
-                recordsArea.append("=== PERFORMANCE RECORDS ===\n\n");
-                
-                // Fastest races
-                recordsArea.append("Fastest Completed Races:\n");
-                for (Horse horse : allHorses) {
-                    if (horse.getFastestTime() > 0) {
-                        recordsArea.append(String.format("  %s: %.2fs (%s track)\n",
-                            horse.getName(),
-                            horse.getFastestTime(),
-                            horse.getFastestTrackType()));
-                    }
-                }
-                recordsArea.append("\n");
-                
-                // Best performers by track type
-                recordsArea.append("Best Win Rates by Track:\n");
-                // You could add your method here to get best performers per track type
-                recordsArea.append("  Oval: " + getBestPerformerByTrack("Oval") + "\n");
-                recordsArea.append("  Straight: " + getBestPerformerByTrack("Straight") + "\n");
-                recordsArea.append("  Figure-Eight: " + getBestPerformerByTrack("Figure-Eight") + "\n");
-                
-                metricsTabs.addTab("Performance", new JScrollPane(recordsArea));
-                
-                metricsPanel.setVisible(true);
-                viewMetricsButton.setText("Resume");
-                metricsPanel.setPreferredSize(new Dimension(getWidth() - 40, 350));
-                revalidate();
-                repaint();
-            }
-        }
-        
-        // Helper method to get best performer by track type
-        private String getBestPerformerByTrack(String trackType) {
-            // Implement your logic using your timing data
-            return "Implement using your race timing methods";
-        }
-        
-        private JTextArea createMetricsTextArea() {
-            JTextArea textArea = new JTextArea();
-            textArea.setEditable(false);
-            textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-            textArea.setMargin(new Insets(10, 10, 10, 10));
-            return textArea;
+           
         }
     }
 }
+
 
   
 class RaceTrackPanel extends JPanel 
@@ -475,15 +358,13 @@ class RaceTrackPanel extends JPanel
     private int laneCount;
     private Timer raceTimer;
     private int trackLength;
-    private boolean raceFinished;
+    boolean raceFinished;
 
     private long startTime;
     private long endTime;
     private boolean raceStarted;
     private boolean isPaused;
 
-
-    private ArrayList<Boolean> horseFellStatus = new ArrayList<>();
     private String winningHorseName;
  
     public RaceTrackPanel(String trackShape, int laneCount, Horse[] horses, int trackLength) 
@@ -549,14 +430,34 @@ class RaceTrackPanel extends JPanel
  
     public void resetRace() 
     {
+        // Stop the current race timer if running
         if (raceTimer != null) 
         {
             raceTimer.stop();
         }
+        
+        // Reset all horses' race state
+        for (Horse horse : horses) 
+        {
+            if (horse != null) {
+                horse.goBackToStart();
+                horse.setFinishTime(-1);  // Reset finish time
+            }
+        }
+        
+        // Reset race state variables
         raceFinished = false;
-
+        isPaused = false;
+        winningHorseName = null;
+        startTime = 0;
+        endTime = 0;
+        
+        // Create new timer
         raceTimer = new Timer(50, e -> updateRace());
         raceTimer.start();
+        
+        // Repaint to show horses at starting positions
+        repaint();
     }
 
     public void stopRace()
@@ -564,92 +465,54 @@ class RaceTrackPanel extends JPanel
             raceTimer.stop();
         }
 
-    private void updateRace() 
-    {
-        if(isPaused || raceFinished)
-        {
-            return;
-        }
-        boolean allHorsesFallen = true;
-        Horse winner = null;
+    private void updateRace() {
+        if (isPaused || raceFinished) return;
+    
+        boolean allHorsesDone = true;
         
-        for (Horse horse : horses) 
-        {
-            if (!horse.hasFallen()) 
-            {
-                allHorsesFallen = false; // At least one horse is still running
-                
-                if (horse.getDistanceTravelled() < trackLength) 
-                {
+        for (Horse horse : horses) {
+            if (!horse.hasFallen() && horse.getFinishTime() == -1) {
+                if (horse.getDistanceTravelled() < trackLength) {
                     horse.moveHorse(trackShape);
-                } 
-                else 
-                {
-                    // Horse has finished the race
-                    endTime = System.currentTimeMillis(); //the end time
-                    raceFinished = true;
+                    allHorsesDone = false;
+                } else {
+                    // Horse just finished now
+                    horse.setFinishTime(System.currentTimeMillis());
+                    System.out.println(horse.getName() + " finished at: " + horse.getFinishTime());
+                }
+            }
+        }
+    
+        if (allHorsesDone) {
+            raceFinished = true;
+            raceTimer.stop();
+            endTime = System.currentTimeMillis();
+    
+            // Determine actual winner (earliest finish time)
+            Horse winner = null;
+            long earliestTime = Long.MAX_VALUE;
+            
+            for (Horse horse : horses) {
+                if (horse.getFinishTime() != -1 && horse.getFinishTime() < earliestTime) {
+                    earliestTime = horse.getFinishTime();
                     winner = horse;
                 }
             }
-        }
-        
-        // Check if all horses have fallen
-        if (allHorsesFallen) 
-        {
-            raceFinished = true;
-            endTime = System.currentTimeMillis(); // the end time
-        }
-        
-        repaint();
-        
-        if (raceFinished) 
-        {
-            raceTimer.stop();
-            double raceDuration = getRaceDuration();
-            horseFellStatus.clear();
-            for (Horse horse : horses) 
-            {
-                horseFellStatus.add(horse.hasFallen());
+    
+            // Update confidences
+            for (Horse horse : horses) {
+                boolean won = (winner != null) && horse.getName().equals(winner.getName());
+                boolean fell = horse.hasFallen();
+                horse.updateConfidenceAfterRace(won, fell);
             }
-            if (winner != null) 
-            {
-                winningHorseName = winner.getName();
-                for (Horse horse : horses) 
-                {
-                    boolean won = horse.getName().equals(winningHorseName);
-                    boolean fell = horse.hasFallen();
-                    horse.recordRaceCompletion(raceDuration, trackShape);
-                    horse.updateConfidenceAfterRace(won, fell);
-                    horse.recordRaceResult(won, fell);
-                }
-            }
-            String message;
-            if (winner != null) 
-            {
-                message = "Race Over! And the winner is... " + winner.getName() + "!";
-            } 
-            else 
-            {
-                message = "Race Over! All horses have fallen!";
-            }
+    
+            // Show results
+            String message = (winner != null) 
+                ? "Race Over! Winner: " + winner.getName() + "!"
+                : "Race Over! All horses have fallen!";
             JOptionPane.showMessageDialog(this, message);
         }
-    }
-
-    private String getWinningHorse() 
-    {
-        Horse winner = null;
-        for (Horse horse : horses) 
-        {
-            if (horse.getDistanceTravelled() >= trackLength) 
-            {
-                if (winner == null || horse.getDistanceTravelled() > winner.getDistanceTravelled()) 
-                {
-                    winner = horse;
-                }
-            }
-        }
-        return winner != null ? winner.getName() : "No winner";
+        repaint();
     }
 
     @Override
@@ -673,11 +536,11 @@ class RaceTrackPanel extends JPanel
 
                 // Draw horizontal red finish line (thick and spans all lanes)
                 g.setColor(Color.RED);
-                g.fillRect(100, height/2, i*40, 5);
+                g.fillRect(100, height/2+5, i*40, 5);
 
                 //Draw horizontal green start line
                 g.setColor(Color.GREEN);
-                g.fillRect(100, height/2+5, i*40, 5);
+                g.fillRect(100, height/2, i*40, 5);
                 g.setColor(Color.BLACK);
             }
 
@@ -809,19 +672,17 @@ class Horse
     private boolean hasFallen;
     private double horseConfidence;
     private  int trackLength;
+    private boolean hasFinished = false;
 
     //accelereation related variables
     private double currentSpeed;
     private double acceleration;
     private double progress;
 
-    //metrics
-    private ArrayList<Double> confidenceHistory = new ArrayList<>();
-    private int wins = 0;
-    private int fell = 0;
-    private int totalRaces = 0;
-    private double fastestTime = Double.MAX_VALUE; // Initialize with very high value
-    private String fastestTrackType = "N/A";
+    //time
+    private long finishTime = -1;  // -1 means hasn't finished
+
+
 
     public Horse(char horseSymbol, String horseName, double horseConfidence, int trackLength) //constructor
     {
@@ -833,40 +694,33 @@ class Horse
         this.trackLength = trackLength;
         this.currentSpeed = 0.0;
         this.acceleration =  0.05 + (horseConfidence * 0.01);
-        this.confidenceHistory.add(horseConfidence);
     }
 
-    public ArrayList<Double> getConfidenceHistory() 
+    public void setFinishTime(long time) 
     {
-        return confidenceHistory;
-    }
-
-    public void recordRaceCompletion(double time, String trackType) 
-    {
-        if (time < fastestTime) 
-        {
-            this.fastestTime = time;
-            this.fastestTrackType = trackType;
-        }
-        totalRaces++;
+        this.finishTime = time;
     }
     
-    public double getFastestTime() 
+    public long getFinishTime() 
     {
-        return fastestTime == Double.MAX_VALUE ? 0 : fastestTime;
-    }
-    
-    public String getFastestTrackType() 
-    {
-        return fastestTrackType;
+        return finishTime;
     }
 
-    public void recordRaceResult(boolean won, boolean horseFell) 
+    public boolean hasFinished() 
     {
-        totalRaces++;
-        if (won) wins++;
-        if (horseFell) fell++;
+        return hasFinished;
     }
+    
+    public void setFinished(boolean finished) 
+    {
+        this.hasFinished = finished;
+    }
+
+    public double getCurrentSpeed()
+    {
+        return this.currentSpeed;
+    }
+    
 
     public void updateConfidenceAfterRace(boolean wonRace, boolean fell) 
     {
@@ -885,29 +739,7 @@ class Horse
         }
         
         double newConfidence = Math.max(0, Math.min(1, horseConfidence + change));
-        confidenceHistory.add(newConfidence);
         horseConfidence = newConfidence;
-    }
-
-    public String getRaceStats() {
-        return String.format("Races: %d | Won: %d | Fell: %d | Win Rate: %.1f%%",
-                        totalRaces, wins, fell,
-                        (wins * 100.0) / totalRaces);
-    }
-
-    public int getTotalRaces()
-    {
-        return this.totalRaces;
-    }
-
-    public int getWins()
-    {
-        return this.wins;
-    }
-
-    public int getFalls()
-    {
-        return this.fell;
     }
     
     public void moveHorse(String trackShape) 
