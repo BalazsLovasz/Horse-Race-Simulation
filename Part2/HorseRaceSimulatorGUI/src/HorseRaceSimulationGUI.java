@@ -134,11 +134,17 @@ class StartRaceGUI extends JFrame
         metricsTabs = new JTabbedPane();
         metricsPanel.add(metricsTabs, BorderLayout.CENTER);
         metricsPanel.setVisible(false);
-
-        JPanel southPanel = new JPanel(new BorderLayout());
-        southPanel.add(horsePanel, BorderLayout.NORTH);
-        southPanel.add(metricsPanel, BorderLayout.SOUTH);
-        add(southPanel, BorderLayout.SOUTH);
+    
+        // Create a panel that will contain both horse panel and metrics
+        JPanel containerPanel = new JPanel(new BorderLayout());
+        containerPanel.add(horsePanel, BorderLayout.NORTH);
+        containerPanel.add(metricsPanel, BorderLayout.CENTER);  // Changed from SOUTH to CENTER
+        
+        // Add the container panel to the main frame
+        add(containerPanel, BorderLayout.SOUTH);
+        
+        // Set a preferred size for the metrics panel
+        metricsPanel.setPreferredSize(new Dimension(getWidth(), 400));  // Adjust 400 as needed
     }
 
     private void setupButtons() 
@@ -535,12 +541,96 @@ class StartRaceGUI extends JFrame
                     // 5. Trends Tab
                     JPanel trendsPanel = new JPanel(new BorderLayout());
                     trendsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                    
-                    // Add components for trends visualization
-                    // (Could include charts or graphs here)
-                    
+
+                    // Create sections for different trends
+                    JPanel trendStatsPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+                    trendStatsPanel.setBorder(BorderFactory.createTitledBorder("Performance Trends"));
+
+                    // Recent Performance
+                    trendStatsPanel.add(new JLabel("Recent Performance:"));
+                    String trend = horse.getWins() > horse.getLosses() ? "Improving" : "Needs Improvement";
+                    trendStatsPanel.add(new JLabel(trend));
+
+                    // Confidence Trend
+                    trendStatsPanel.add(new JLabel("Confidence Trend:"));
+                    String confidenceTrend = horse.getConfidence() >= 0.5 ? "Strong" : "Building";
+                    trendStatsPanel.add(new JLabel(confidenceTrend));
+
+                    // Fall Rate
+                    trendStatsPanel.add(new JLabel("Fall Rate:"));
+                    trendStatsPanel.add(new JLabel(String.format("%.1f%%", (double)horse.getFalls() / totalRaces * 100)));
+
+                    // Success by Track Type
+                    trendStatsPanel.add(new JLabel("Preferred Track:"));
+                    trendStatsPanel.add(new JLabel("Analysis in Progress")); // Placeholder
+
+                    // Weather Performance
+                    trendStatsPanel.add(new JLabel("Best Weather Condition:"));
+                    trendStatsPanel.add(new JLabel("Analysis in Progress")); // Placeholder
+
+                    trendsPanel.add(trendStatsPanel, BorderLayout.NORTH);
+
+                    // Adding the performance graph
+                    JPanel graphPanel = new JPanel() 
+                    {
+                        @Override
+                        protected void paintComponent(Graphics g) 
+                        {
+                            super.paintComponent(g);
+                            int width = getWidth();
+                            int height = getHeight();
+                            
+                            // Drawing the axes
+                            g.setColor(Color.BLACK);
+                            g.drawLine(50, height-50, width-50, height-50);  // X axis
+                            g.drawLine(50, height-50, 50, 50);  // Y axis
+                            
+                            // Getting race history data
+                            Object[][] historyData = loadConfidenceHistory(horse.getName());
+                            if (historyData.length > 0) 
+                            {
+                                int maxEntries = Math.min(historyData.length, 10);  // Shows last 10 races
+                                int barWidth = (width-100) / maxEntries;
+                                
+                                // Draw bars for each race
+                                for (int i = 0; i < maxEntries; i++) 
+                                {
+                                    int index = historyData.length - maxEntries + i;
+                                    if (index >= 0) 
+                                    {
+                                        // Gets position from history data
+                                        int position = (int)historyData[index][2];  // Position is in column 2
+                                        
+                                        // Calculates bar height 
+                                        int barHeight = (height-100) * (6-position) / 5;  // max 5 horses
+                                        
+                                        // Draw bar
+                                        g.setColor(position == 1 ? Color.GREEN : Color.RED);
+                                        g.fillRect(50 + i*barWidth, height-50-barHeight, barWidth-2, barHeight);
+                                    }
+                                }
+                                
+                                // Draw labels
+                                g.setColor(Color.BLACK);
+                                g.drawString("Recent Races →", width/2-30, height-20);
+                                g.drawString("Position", 4, height/2);
+                            } 
+                            else 
+                            {
+                                g.drawString("No race history available", width/2-50, height/2);
+                            }
+                        }
+                    };
+                    graphPanel.setPreferredSize(new Dimension(400, 200));
+                    graphPanel.setBorder(BorderFactory.createTitledBorder("Performance Graph (Last 10 Races)"));
+
+                    // Add both panels to the trends panel
+                    trendsPanel.add(trendStatsPanel, BorderLayout.NORTH);
+                    trendsPanel.add(graphPanel, BorderLayout.CENTER);
+
+                    // Add the Trends tab once
                     horseSubTabs.addTab("Trends", trendsPanel);
-                    
+
                     // Add the horse's sub-tabs to the main tabs
                     metricsTabs.addTab(horse.getName(), horseSubTabs);
                 }
@@ -723,31 +813,28 @@ class StartRaceGUI extends JFrame
         return history.toArray(new Object[0][0]);
     }
 
-    public void saveTrackRecord(String trackType, String condition, double raceTime) 
-    {
-        try 
-        {
+    public void saveTrackRecord(String trackType, String condition, double raceTime) {
+        try {
+            
             File dataDir = new File(DATA_DIR);
-            if (!dataDir.exists() && !dataDir.mkdirs()) 
-            {
+            if (!dataDir.exists() && !dataDir.mkdirs()) {
                 throw new IOException("Could not create data directory");
             }
     
-            // Loading all existing records
+            // Load all existing records
             List<String[]> allRecords = loadAllTrackRecords();
             boolean recordExists = false;
             
-            // Checking if this track/condition combination exists
+            // Check if this track/condition combination exists
             for (String[] record : allRecords) {
-                if (record[0].equals(trackType) && record[1].equals(condition)) 
-                {
+                if (record[0].equals(trackType) && record[1].equals(condition)) {
                     recordExists = true;
                     double currentBest = Double.parseDouble(record[2]);
-                    int racesCount = Integer.parseInt(record[3]) + 1;
+                    int racesCount = Integer.parseInt(record[3]);
+                    racesCount++;
                     
                     // Update best time if this race was faster
-                    if (raceTime < currentBest) 
-                    {
+                    if (raceTime < currentBest) {
                         record[2] = String.format("%.2f", raceTime);
                     }
                     record[3] = String.valueOf(racesCount);
@@ -756,21 +843,24 @@ class StartRaceGUI extends JFrame
             }
             
             // If no existing record found, create new one
-            if (!recordExists) 
-            {
-                allRecords.add(new String[]{trackType, condition, String.format("%.2f", raceTime), "1"}); //first race sets initial best time
+            if (!recordExists) {
+                System.out.println("Creating new record");  // Debug print
+                allRecords.add(new String[]{
+                    trackType,
+                    condition,
+                    String.format("%.2f", raceTime),
+                    "1"
+                });
             }
             
             // Rewrite the entire file with updated records
-            try (PrintWriter writer = new PrintWriter(new FileWriter(TRACK_RECORDS_FILE))) 
-            {
+            try (PrintWriter writer = new PrintWriter(new FileWriter(TRACK_RECORDS_FILE))) {
                 writer.println("TrackType,Condition,BestTime,RacesCompleted");
-                for (String[] record : allRecords) 
-                {
+                for (String[] record : allRecords) {
                     writer.println(String.join(",", record));
                 }
             }
-        } 
+        }
         catch (IOException e) 
         {
             JOptionPane.showMessageDialog(this, "Error saving track record: " + e.getMessage(),"Error", JOptionPane.ERROR_MESSAGE);
