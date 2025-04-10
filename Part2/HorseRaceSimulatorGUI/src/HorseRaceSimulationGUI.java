@@ -19,12 +19,15 @@ import java.util.List;
 import javax.swing.*;
 
 
+
 class StartRaceGUI extends JFrame 
 {
     // Constants
     private static final String DATA_DIR = System.getProperty("user.home") + "/HorseRaceData";
     private static final String CSV_FILE = DATA_DIR + "/horse_data.csv";
     private static final String CONFIDENCE_HISTORY_FILE = DATA_DIR + "/confidence_history.csv";
+    private static final String TRACK_RECORDS_FILE = DATA_DIR + "/track_records.csv";
+    
 
     // Main Panels
     private JPanel customisingPanel, mainPanel, horsePanel;
@@ -346,7 +349,7 @@ class StartRaceGUI extends JFrame
             customisingPanel.setVisible(false);
 
             // this create the graphical track panel
-            currentRacePanel = new RaceTrackPanel(trackShapeString, numberOfLanes, horses, trackLengthInteger, StartRaceGUI.this);
+            currentRacePanel = new RaceTrackPanel(trackShapeString, numberOfLanes, horses, trackLengthInteger, StartRaceGUI.this, weatherConditionString);
 
             // this updates the race display panel
             customisingPanel.setVisible(false);
@@ -484,15 +487,18 @@ class StartRaceGUI extends JFrame
                         averageSpeed = trackLengthInteger / raceTime;
                     }
                     
+                    //Win percentage
                     performancePanel.add(new JLabel("Win Percentage:"));
                     performancePanel.add(new JLabel(String.format("%.1f%%", winPercentage)));
                     
-                    // Placeholder for future metrics
+                    // Average speed
                     performancePanel.add(new JLabel("Average Speed:"));
                     performancePanel.add(new JLabel(String.format("%.2f m/s", averageSpeed)));
                     
-                    performancePanel.add(new JLabel("Best Time:"));
-                    performancePanel.add(new JLabel("To be calculated"));
+                    //Status
+                    String status = horse.getFinishTime()>0 ? "FINISHED" : horse.hasFallen() ? "FALLEN" : "RACING";
+                    performancePanel.add(new JLabel("Status:"));
+                    performancePanel.add(new JLabel(status));
                     
                     horseSubTabs.addTab("Performance", performancePanel);
                     
@@ -516,8 +522,8 @@ class StartRaceGUI extends JFrame
                     trackRecordsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                     
                     // Table for track records
-                    String[] trackColumns = {"Track Type", "Best Time", "Average Time", "Races Completed"};
-                    Object[][] trackData = {}; // To be populated with actual data
+                    String[] trackColumns = {"Track Type", "Condition", "Best Time", "Races Completed"};
+                    Object[][] trackData = loadTrackRecords(); 
                     JTable trackTable = new JTable(trackData, trackColumns);
                     trackTable.setFillsViewportHeight(true);
                     
@@ -629,7 +635,8 @@ class StartRaceGUI extends JFrame
         }
     }
     
-    public void saveConfidenceHistory(Horse horse, String trackShape, int position, double time, double speed, double confidenceBefore, double confidenceAfter) {
+    public void saveConfidenceHistory(Horse horse, String trackShape, int position, double time, double speed, double confidenceBefore, double confidenceAfter) 
+    {
         try 
         {
             // Create data directory if it doesn't exist
@@ -715,6 +722,132 @@ class StartRaceGUI extends JFrame
         
         return history.toArray(new Object[0][0]);
     }
+
+    public void saveTrackRecord(String trackType, String condition, double raceTime) 
+    {
+        try 
+        {
+            File dataDir = new File(DATA_DIR);
+            if (!dataDir.exists() && !dataDir.mkdirs()) 
+            {
+                throw new IOException("Could not create data directory");
+            }
+    
+            // Loading all existing records
+            List<String[]> allRecords = loadAllTrackRecords();
+            boolean recordExists = false;
+            
+            // Checking if this track/condition combination exists
+            for (String[] record : allRecords) {
+                if (record[0].equals(trackType) && record[1].equals(condition)) 
+                {
+                    recordExists = true;
+                    double currentBest = Double.parseDouble(record[2]);
+                    int racesCount = Integer.parseInt(record[3]) + 1;
+                    
+                    // Update best time if this race was faster
+                    if (raceTime < currentBest) 
+                    {
+                        record[2] = String.format("%.2f", raceTime);
+                    }
+                    record[3] = String.valueOf(racesCount);
+                    break;
+                }
+            }
+            
+            // If no existing record found, create new one
+            if (!recordExists) 
+            {
+                allRecords.add(new String[]{trackType, condition, String.format("%.2f", raceTime), "1"}); //first race sets initial best time
+            }
+            
+            // Rewrite the entire file with updated records
+            try (PrintWriter writer = new PrintWriter(new FileWriter(TRACK_RECORDS_FILE))) 
+            {
+                writer.println("TrackType,Condition,BestTime,RacesCompleted");
+                for (String[] record : allRecords) 
+                {
+                    writer.println(String.join(",", record));
+                }
+            }
+        } 
+        catch (IOException e) 
+        {
+            JOptionPane.showMessageDialog(this, "Error saving track record: " + e.getMessage(),"Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private List<String[]> loadAllTrackRecords() throws IOException 
+    {
+        List<String[]> records = new ArrayList<>();
+        File file = new File(TRACK_RECORDS_FILE);
+        
+        if (!file.exists()) 
+        {
+            return records;
+        }
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) 
+        {
+            String line;
+            reader.readLine(); // Skip header
+            while ((line = reader.readLine()) != null) 
+            {
+                records.add(line.split(","));
+            }
+        }
+        return records;
+    }
+
+    private Object[][] loadTrackRecords() 
+    {
+        List<Object[]> records = new ArrayList<>();
+        File file = new File(TRACK_RECORDS_FILE);
+        
+        if (!file.exists()) 
+        {
+            return new Object[0][0];
+        }
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) 
+        {
+            String line;
+            reader.readLine(); // Skip header
+            while ((line = reader.readLine()) != null) 
+            {
+                String[] data = line.split(",");
+                if (data.length >= 4) {
+                    records.add(new Object[]{
+                        data[0], // TrackType
+                        data[1], // Condition
+                        formatTime(Double.parseDouble(data[2])), // Formatted BestTime
+                        data[3]  // RacesCompleted
+                    });
+                }
+            }
+        } 
+        catch (IOException e) 
+        {
+            JOptionPane.showMessageDialog(this, 
+                "Error loading track records: " + e.getMessage(),"Error", JOptionPane.ERROR_MESSAGE);
+        }
+        
+        // Sort by track type then condition
+        records.sort((a, b) -> {
+            int typeCompare = a[0].toString().compareTo(b[0].toString());
+            if (typeCompare != 0) return typeCompare;
+            return a[1].toString().compareTo(b[1].toString());
+        });
+        
+        return records.toArray(new Object[0][0]);
+    }
+    
+    private String formatTime(double seconds) 
+    {
+        int minutes = (int) (seconds / 60);
+        double remainingSeconds = seconds % 60;
+        return String.format("%d:%.2f", minutes, remainingSeconds);
+    }
 }
 
 
@@ -725,6 +858,7 @@ class RaceTrackPanel extends JPanel
     private StartRaceGUI parentGUI;
     private Horse[] horses;
     private String trackShape;
+    private String weatherCondition;
     private int laneCount;
     private Timer raceTimer;
     private int trackLength;
@@ -734,10 +868,11 @@ class RaceTrackPanel extends JPanel
     private boolean isPaused;
 
     // Constructor
-    public RaceTrackPanel(String trackShape, int laneCount, Horse[] horses, int trackLength, StartRaceGUI parent) 
+    public RaceTrackPanel(String trackShape, int laneCount, Horse[] horses, int trackLength, StartRaceGUI parent, String weatherCondition) 
     {
         this.parentGUI = parent;
         this.trackShape = trackShape;
+        this.weatherCondition = weatherCondition;
         this.laneCount = laneCount;
         this.horses = horses;
         this.trackLength = trackLength;
@@ -868,17 +1003,32 @@ class RaceTrackPanel extends JPanel
             raceFinished = true;
             raceTimer.stop();
     
-            // Create list of all horses that participated
+            // Creating a list of all horses that participated
             List<Horse> raceParticipants = new ArrayList<>();
             for (Horse horse : horses) 
             {
-                raceParticipants.add(horse);
+                if (!horse.hasFallen())   // Only adding horses that haven't fallen
+                {
+                    raceParticipants.add(horse);
+                }
             }
-    
+            
+            // Process fallen horses separately
+            List<Horse> fallenHorses = new ArrayList<>();
+            for (Horse horse : horses) 
+            {
+                if (horse.hasFallen()) 
+                {
+                    fallenHorses.add(horse);
+                    horse.setLosses(horse.getLosses() + 1);
+                    horse.setFalls(horse.getFalls() + 1);
+                }
+            }
             // Sort by finish time to determine positions
             raceParticipants.sort(Comparator.comparingLong(Horse::getFinishTime));
     
-            // Record history for each horse
+
+             // Record history for each horse
             for (int i = 0; i < raceParticipants.size(); i++) 
             {
                 Horse horse = raceParticipants.get(i);
@@ -889,27 +1039,39 @@ class RaceTrackPanel extends JPanel
                 if (i == 0) 
                 {
                     horse.setWins(horse.getWins() + 1);
+                    parentGUI.saveTrackRecord(trackShape, weatherCondition, time);
                 } 
                 else 
                 {
                     horse.setLosses(horse.getLosses() + 1);
                 }
                 
-                if (horse.hasFallen()) 
-                {
-                    horse.setFalls(horse.getFalls() + 1);
-                }
                 boolean won = (i == 0);
-                boolean fell = horse.hasFallen();
+                boolean fell = false;  // These horses haven't fallen
+                
                 horse.updateConfidenceAfterRace(won, fell);
                 
                 // Save confidence history
                 parentGUI.saveConfidenceHistory(horse, trackShape, i + 1, time, speed, confidenceBefore, horse.getConfidence());
             }
-    
+
+            // Process fallen horses confidence history
+            for (int i = 0; i < fallenHorses.size(); i++) 
+            {
+                Horse horse = fallenHorses.get(i);
+                double time = horse.getFinishTime() / 1000.0;
+                double speed = horse.getDistanceTravelled() / time;
+                double confidenceBefore = horse.getConfidence();
+                
+                horse.updateConfidenceAfterRace(false, true);
+                
+                // Save confidence history (fallen horses are placed after finishing horses)
+                parentGUI.saveConfidenceHistory(horse, trackShape, raceParticipants.size() + i + 1, time, speed, confidenceBefore, horse.getConfidence());
+            }
+
             // Save all horse data to CSV
             parentGUI.saveHorsesToCSV();
-    
+
             // Show results
             String message = (raceParticipants.size() > 0) 
                 ? "Race Over! Winner: " + raceParticipants.get(0).getName() + "!"
@@ -1253,6 +1415,8 @@ class Horse
 
     public void moveHorse(String trackShape) 
     {
+        if (hasFinished) return; // Preventing any further movement if finished
+
         boolean inDecelZone = false;
 
         if (trackShape.equals("Oval") && (progress >= 0.4 && progress <= 0.5)) 
@@ -1276,7 +1440,7 @@ class Horse
     
         this.distanceTravelled += currentSpeed;
 
-        if (Math.random() < 0.001 * Math.exp(this.horseConfidence)) 
+        if (Math.random() < 0.0005 * Math.exp(this.horseConfidence)) 
         {
             this.hasFallen = true;
         }
