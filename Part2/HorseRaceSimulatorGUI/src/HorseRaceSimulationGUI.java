@@ -15,7 +15,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.swing.*;
 
 
@@ -98,6 +100,11 @@ class StartRaceGUI extends JFrame
         add(customisingPanel, BorderLayout.NORTH);
     }
 
+    public void setCurrentRacePanel(RaceTrackPanel panel) 
+    {
+        this.currentRacePanel = panel;
+    }
+
     private void setupCustomisingPanel() 
     {
         // Track Length Selection
@@ -118,7 +125,7 @@ class StartRaceGUI extends JFrame
 
         // Track Shape Selection
         customisingPanel.add(new JLabel("Track Shape:"));
-        trackShape = new JComboBox<>(new String[]{"Oval","Figure-Eight","Straight", "Zig-Zag"});
+        trackShape = new JComboBox<>(new String[]{"Oval","Figure-Eight","Straight"});
         customisingPanel.add(trackShape);
     }
 
@@ -134,17 +141,19 @@ class StartRaceGUI extends JFrame
         metricsTabs = new JTabbedPane();
         metricsPanel.add(metricsTabs, BorderLayout.CENTER);
         metricsPanel.setVisible(false);
-    
+
         // Create a panel that will contain both horse panel and metrics
         JPanel containerPanel = new JPanel(new BorderLayout());
         containerPanel.add(horsePanel, BorderLayout.NORTH);
-        containerPanel.add(metricsPanel, BorderLayout.CENTER);  // Changed from SOUTH to CENTER
+        containerPanel.add(metricsPanel, BorderLayout.CENTER);
+        
+        // Set explicit sizes
+        int metricsHeight = 400;  // Adjust this value as needed
+        metricsPanel.setPreferredSize(new Dimension(getWidth(), metricsHeight));
+        metricsPanel.setMinimumSize(new Dimension(getWidth(), metricsHeight));
         
         // Add the container panel to the main frame
         add(containerPanel, BorderLayout.SOUTH);
-        
-        // Set a preferred size for the metrics panel
-        metricsPanel.setPreferredSize(new Dimension(getWidth(), 400));  // Adjust 400 as needed
     }
 
     private void setupButtons() 
@@ -356,6 +365,7 @@ class StartRaceGUI extends JFrame
 
             // this create the graphical track panel
             currentRacePanel = new RaceTrackPanel(trackShapeString, numberOfLanes, horses, trackLengthInteger, StartRaceGUI.this, weatherConditionString);
+            setCurrentRacePanel(currentRacePanel);
 
             // this updates the race display panel
             customisingPanel.setVisible(false);
@@ -430,19 +440,24 @@ class StartRaceGUI extends JFrame
             {
                 metricsPanel.setVisible(false);
                 viewMetricsButton.setText("Metrics");
-                currentRacePanel.resumeRace();
-            }
+                if (currentRacePanel != null) 
+                {
+                    currentRacePanel.resumeRace();
+                }
+            } 
             else 
             {
-                metricsPanel.setVisible(true);
-                viewMetricsButton.setText("Hide Metrics");
-                currentRacePanel.pauseRace();
+                if (currentRacePanel != null) 
+                {
+                    currentRacePanel.pauseRace();
+                }
                 
                 // Clear existing tabs
                 metricsTabs.removeAll();
                 
                 // Create tabs for each horse
-                for (Horse horse : allHorses) {
+                for (Horse horse : allHorses) 
+                {
                     // Main tab panel with sub-tabs
                     JTabbedPane horseSubTabs = new JTabbedPane();
                     
@@ -460,8 +475,8 @@ class StartRaceGUI extends JFrame
                     basicInfoPanel.add(new JLabel(String.format("%.2f", horse.getConfidence())));
                     
                     horseSubTabs.addTab("Basic Info", basicInfoPanel);
-                    
-                    // 2. Performance Metrics Tab
+                        
+                        // 2. Performance Metrics Tab
                     JPanel performancePanel = new JPanel(new GridLayout(0, 2, 5, 5));
                     performancePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                     
@@ -507,8 +522,8 @@ class StartRaceGUI extends JFrame
                     performancePanel.add(new JLabel(status));
                     
                     horseSubTabs.addTab("Performance", performancePanel);
-                    
-                    // 3. Race History Tab
+                        
+                        // 3. Race History Tab
                     JPanel historyPanel = new JPanel(new BorderLayout());
                     historyPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                     
@@ -537,8 +552,8 @@ class StartRaceGUI extends JFrame
                     trackRecordsPanel.add(trackScrollPane, BorderLayout.CENTER);
                     
                     horseSubTabs.addTab("Track Records", trackRecordsPanel);
-                    
-                    // 5. Trends Tab
+
+                    // 5. Trends Tab - Initial Setup
                     JPanel trendsPanel = new JPanel(new BorderLayout());
                     trendsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -546,7 +561,7 @@ class StartRaceGUI extends JFrame
                     JPanel trendStatsPanel = new JPanel(new GridLayout(0, 2, 5, 5));
                     trendStatsPanel.setBorder(BorderFactory.createTitledBorder("Performance Trends"));
 
-                    // Recent Performance
+                        // Recent Performance
                     trendStatsPanel.add(new JLabel("Recent Performance:"));
                     String trend = horse.getWins() > horse.getLosses() ? "Improving" : "Needs Improvement";
                     trendStatsPanel.add(new JLabel(trend));
@@ -560,18 +575,87 @@ class StartRaceGUI extends JFrame
                     trendStatsPanel.add(new JLabel("Fall Rate:"));
                     trendStatsPanel.add(new JLabel(String.format("%.1f%%", (double)horse.getFalls() / totalRaces * 100)));
 
-                    // Success by Track Type
-                    trendStatsPanel.add(new JLabel("Preferred Track:"));
-                    trendStatsPanel.add(new JLabel("Analysis in Progress")); // Placeholder
+                    // Success by Track Type && weather performance
+                    Object[][] historyData = loadConfidenceHistory(horse.getName());
+                    Map<String, Integer> trackWins = new HashMap<>();
+                    Map<String, Integer> trackRaces = new HashMap<>();
+                    Map<String, Integer> weatherWins = new HashMap<>();
+                    Map<String, Integer> weatherRaces = new HashMap<>();
 
-                    // Weather Performance
+                    // Analysis of the history data
+                    for (Object[] raceData : historyData) 
+                    {
+                        String trackType = (String)raceData[1];  // Track type is in column 1
+                        int position = (int)raceData[2];         // Position is in column 2
+                        
+                        // Track type analysis
+                        trackRaces.put(trackType, trackRaces.getOrDefault(trackType, 0) + 1);
+                        if (position == 1) 
+                        {
+                            trackWins.put(trackType, trackWins.getOrDefault(trackType, 0) + 1);
+                        }
+                        
+                        // Get weather condition from track records
+                        Object[][] trackRecords = loadTrackRecords();
+                        for (Object[] record : trackRecords) 
+                        {
+                            if (record[0].equals(trackType)) 
+                            {
+                                String weather = (String)record[1];  // Weather condition
+                                weatherRaces.put(weather, weatherRaces.getOrDefault(weather, 0) + 1);
+                                if (position == 1) 
+                                {
+                                    weatherWins.put(weather, weatherWins.getOrDefault(weather, 0) + 1);
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    // Find preferred track (highest win percentage)
+                    String preferredTrack = "No races yet";
+                    double bestTrackRate = 0;
+                    for (String track : trackRaces.keySet()) 
+                    {
+                        int races = trackRaces.get(track);
+                        int wins = trackWins.getOrDefault(track, 0);
+                        double winRate = (double)wins / races;
+                        if (winRate > bestTrackRate) 
+                        {
+                            bestTrackRate = winRate;
+                            preferredTrack = track + " (" + String.format("%.1f%%", winRate * 100) + " wins)";
+                        }
+                    }
+
+                    // Find best weather condition
+                    String bestWeather = "No races yet";
+                    double bestWeatherRate = 0;
+                    for (String weather : weatherRaces.keySet()) 
+                    {
+                        int races = weatherRaces.get(weather);
+                        int wins = weatherWins.getOrDefault(weather, 0);
+                        double winRate = (double)wins / races;
+                        if (winRate > bestWeatherRate) 
+                        {
+                            bestWeatherRate = winRate;
+                            bestWeather = weather + " (" + String.format("%.1f%%", winRate * 100) + " wins)";
+                        }
+                    }
+
+                    // Update the labels
+                    trendStatsPanel.add(new JLabel("Preferred Track:"));
+                    trendStatsPanel.add(new JLabel(preferredTrack));
+
                     trendStatsPanel.add(new JLabel("Best Weather Condition:"));
-                    trendStatsPanel.add(new JLabel("Analysis in Progress")); // Placeholder
+                    trendStatsPanel.add(new JLabel(bestWeather));
 
                     trendsPanel.add(trendStatsPanel, BorderLayout.NORTH);
 
-                    // Adding the performance graph
-                    JPanel graphPanel = new JPanel() 
+                        // Create a panel for all graphs
+                    JPanel allGraphsPanel = new JPanel(new GridLayout(2, 2, 10, 10));  // 2x2 grid with gaps
+
+                    // 1. Position Graph
+                    JPanel positionGraphPanel = new JPanel() 
                     {
                         @Override
                         protected void paintComponent(Graphics g) 
@@ -582,15 +666,15 @@ class StartRaceGUI extends JFrame
                             
                             // Drawing the axes
                             g.setColor(Color.BLACK);
-                            g.drawLine(50, height-50, width-50, height-50);  // X axis
-                            g.drawLine(50, height-50, 50, 50);  // Y axis
+                            g.drawLine(70, height-50, width-50, height-50);  // X axis
+                            g.drawLine(70, height-50, 70, 50);  // Y axis
                             
                             // Getting race history data
                             Object[][] historyData = loadConfidenceHistory(horse.getName());
                             if (historyData.length > 0) 
                             {
                                 int maxEntries = Math.min(historyData.length, 10);  // Shows last 10 races
-                                int barWidth = (width-100) / maxEntries;
+                                int barWidth = (width-120) / maxEntries;
                                 
                                 // Draw bars for each race
                                 for (int i = 0; i < maxEntries; i++) 
@@ -598,22 +682,17 @@ class StartRaceGUI extends JFrame
                                     int index = historyData.length - maxEntries + i;
                                     if (index >= 0) 
                                     {
-                                        // Gets position from history data
-                                        int position = (int)historyData[index][2];  // Position is in column 2
+                                        int position = (int)historyData[index][2];
+                                        int barHeight = (height-100) * (6-position) / 5;
                                         
-                                        // Calculates bar height 
-                                        int barHeight = (height-100) * (6-position) / 5;  // max 5 horses
-                                        
-                                        // Draw bar
                                         g.setColor(position == 1 ? Color.GREEN : Color.RED);
-                                        g.fillRect(50 + i*barWidth, height-50-barHeight, barWidth-2, barHeight);
+                                        g.fillRect(70 + i*barWidth, height-50-barHeight, barWidth-2, barHeight);
                                     }
                                 }
                                 
-                                // Draw labels
                                 g.setColor(Color.BLACK);
                                 g.drawString("Recent Races →", width/2-30, height-20);
-                                g.drawString("Position", 4, height/2);
+                                g.drawString("Position", 15, height/2);
                             } 
                             else 
                             {
@@ -621,23 +700,224 @@ class StartRaceGUI extends JFrame
                             }
                         }
                     };
-                    graphPanel.setPreferredSize(new Dimension(400, 200));
-                    graphPanel.setBorder(BorderFactory.createTitledBorder("Performance Graph (Last 10 Races)"));
+                    positionGraphPanel.setPreferredSize(new Dimension(400, 200));
+                    positionGraphPanel.setBorder(BorderFactory.createTitledBorder("Race Positions (Last 10 Races)"));
 
-                    // Add both panels to the trends panel
+                    // 2. Confidence Graph
+                    JPanel confidenceGraphPanel = new JPanel() 
+                    {
+                        @Override
+                        protected void paintComponent(Graphics g) 
+                        {
+                            super.paintComponent(g);
+                            int width = getWidth();
+                            int height = getHeight();
+                            
+                            // Drawing the axes with increased left margin
+                            g.setColor(Color.BLACK);
+                            g.drawLine(70, height-50, width-50, height-50);  // X axis
+                            g.drawLine(70, height-50, 70, 50);  // Y axis
+                            
+                            Object[][] historyData = loadConfidenceHistory(horse.getName());
+                            if (historyData.length > 1)  // Changed from > 0 to > 1 since we need at least 2 points
+                            {
+                                int maxEntries = Math.min(historyData.length, 10);
+                                int xStep = (width-120) / Math.max(maxEntries-1, 1);  // Prevent division by zero
+                                
+                                // Draw confidence line
+                                g.setColor(Color.BLUE);
+                                for (int i = 0; i < maxEntries-1; i++) 
+                                {
+                                    int index = historyData.length - maxEntries + i;
+                                    if (index >= 0 && index+1 < historyData.length) 
+                                    {
+                                        double conf1 = (double)historyData[index][5];
+                                        double conf2 = (double)historyData[index+1][5];
+                                        
+                                        int x1 = 70 + i*xStep;
+                                        int x2 = 70 + (i+1)*xStep;
+                                        int y1 = height-50 - (int)((height-100) * conf1);
+                                        int y2 = height-50 - (int)((height-100) * conf2);
+                                        
+                                        g.drawLine(x1, y1, x2, y2);
+                                    }
+                                }
+                                
+                                g.setColor(Color.BLACK);
+                                g.drawString("Races →", width/2-30, height-20);
+                                g.drawString("Confidence", 5, height/2);
+                            } 
+                            else if (historyData.length == 1) 
+                            {
+                                // Draw single point if only one data point exists
+                                g.setColor(Color.BLUE);
+                                double conf = (double)historyData[0][5];
+                                int y = height-50 - (int)((height-100) * conf);
+                                g.fillOval(width/2-3, y-3, 6, 6);  // Draw a dot
+                                
+                                g.setColor(Color.BLACK);
+                                g.drawString("Races →", width/2-30, height-20);
+                                g.drawString("Confidence",5, height/2);
+                            }
+                            else 
+                            {
+                                g.drawString("No confidence history available", width/2-50, height/2);
+                            }
+                        }
+                    };
+                    confidenceGraphPanel.setPreferredSize(new Dimension(400, 200));
+                    confidenceGraphPanel.setBorder(BorderFactory.createTitledBorder("Confidence Trend"));
+
+                    // 3. Win Rate Graph
+                    JPanel winRateGraphPanel = new JPanel() 
+                    {
+                        @Override
+                        protected void paintComponent(Graphics g) 
+                        {
+                            super.paintComponent(g);
+                            int width = getWidth();
+                            int height = getHeight();
+                            
+                            // Drawing the axes
+                            g.setColor(Color.BLACK);
+                            g.drawLine(70, height-50, width-50, height-50);  // X axis
+                            g.drawLine(70, height-50, 70, 50);  // Y axis
+                            
+                            Object[][] historyData = loadConfidenceHistory(horse.getName());
+                            if (historyData.length > 0) 
+                            {
+                                int maxEntries = Math.min(historyData.length, 10);
+                                int xStep = (width-120) / maxEntries;
+                                
+                                int wins = 0;
+                                int total = 0;
+                                
+                                // Draw win rate bars
+                                for (int i = 0; i < maxEntries; i++) 
+                                {
+                                    int index = historyData.length - maxEntries + i;
+                                    if (index >= 0) 
+                                    {
+                                        total++;
+                                        if ((int)historyData[index][2] == 1) 
+                                        {  // Position is 1 (win)
+                                            wins++;
+                                        }
+                                        
+                                        double winRate = (double)wins / total;
+                                        int barHeight = (int)((height-100) * winRate);
+                                        
+                                        g.setColor(new Color(0, 150, 0));  // Dark green
+                                        g.fillRect(70 + i*xStep, height-50-barHeight, xStep-2, barHeight);
+                                    }
+                                }
+                                
+                                g.setColor(Color.BLACK);
+                                g.drawString("Races →", width/2-30, height-20);
+                                g.drawString("Win Rate", 15, height/2);
+                            } 
+                            else 
+                            {
+                                g.drawString("No race history available", width/2-50, height/2);
+                            }
+                        }
+                    };
+                    winRateGraphPanel.setPreferredSize(new Dimension(400, 200));
+                    winRateGraphPanel.setBorder(BorderFactory.createTitledBorder("Win Rate Progress"));
+
+                     // 4. Track Performance Graph
+                    JPanel trackPerformanceGraphPanel = new JPanel() 
+                    {
+                        @Override
+                        protected void paintComponent(Graphics g) 
+                        {
+                            super.paintComponent(g);
+                            int width = getWidth();
+                            int height = getHeight();
+                            
+                            // Drawing the axes with increased left margin
+                            g.setColor(Color.BLACK);
+                            g.drawLine(70, height-50, width-50, height-50);  // X axis
+                            g.drawLine(70, height-50, 70, 50);  // Y axis
+                            
+                            Map<String, Double> trackWinRates = new HashMap<>();
+                            for (String track : trackRaces.keySet()) 
+                            {
+                                int races = trackRaces.get(track);
+                                int wins = trackWins.getOrDefault(track, 0);
+                                trackWinRates.put(track, (double)wins / races);
+                            }
+                            
+                            if (!trackWinRates.isEmpty()) 
+                            {
+                                int barWidth = (width-120) / trackWinRates.size();  // Adjusted for new margin
+                                int i = 0;
+                                
+                                for (Map.Entry<String, Double> entry : trackWinRates.entrySet()) 
+                                {
+                                    int barHeight = (int)((height-100) * entry.getValue());
+                                    
+                                    g.setColor(new Color(
+                                        (int)(Math.random() * 128) + 128,
+                                        (int)(Math.random() * 128) + 128,
+                                        (int)(Math.random() * 128) + 128
+                                    ));
+                                    
+                                    g.fillRect(70 + i*barWidth, height-50-barHeight, barWidth-2, barHeight);
+                                    
+                                    g.setColor(Color.BLACK);
+                                    g.drawString(entry.getKey(), 70 + i*barWidth, height-35);
+                                    
+                                    i++;
+                                }
+                                
+                                g.setColor(Color.BLACK);
+                                g.drawString("Track Types", width/2-30, height-10);
+                                g.drawString("Win Rate", 15, height/2);
+                            } 
+                            else 
+                            {
+                                g.drawString("No track performance data available", width/2-50, height/2);
+                            }
+                        }
+                    };
+                    trackPerformanceGraphPanel.setPreferredSize(new Dimension(400, 200));
+                    trackPerformanceGraphPanel.setBorder(BorderFactory.createTitledBorder("Track Type Performance"));
+
+                    // Add all graphs to the panel
+                    allGraphsPanel.add(positionGraphPanel);
+                    allGraphsPanel.add(confidenceGraphPanel);
+                    allGraphsPanel.add(winRateGraphPanel);
+                    allGraphsPanel.add(trackPerformanceGraphPanel);
+
+                    // Add components to the trends panel
                     trendsPanel.add(trendStatsPanel, BorderLayout.NORTH);
-                    trendsPanel.add(graphPanel, BorderLayout.CENTER);
+                    trendsPanel.add(allGraphsPanel, BorderLayout.CENTER);
 
-                    // Add the Trends tab once
-                    horseSubTabs.addTab("Trends", trendsPanel);
+                    // Wrap the trendsPanel in a JScrollPane
+                    JScrollPane trendsScrollPane = new JScrollPane(trendsPanel);
+                    trendsScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+                    trendsScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
-                    // Add the horse's sub-tabs to the main tabs
+                    // Add the Trends tab with the scroll pane
+                    horseSubTabs.addTab("Trends", trendsScrollPane);
+
+                    // Add this horse's complete tab set to the main metrics tabs
                     metricsTabs.addTab(horse.getName(), horseSubTabs);
                 }
+
+                metricsPanel.setVisible(true);
+                viewMetricsButton.setText("Hide Metrics");
+                
+                // Force revalidation
+                metricsPanel.revalidate();
+                metricsPanel.repaint();
+                mainPanel.revalidate();
+                mainPanel.repaint();
             }
         }
-        
     }
+
     public void saveHorsesToCSV() 
     {
         try 
@@ -1077,7 +1357,7 @@ class RaceTrackPanel extends JPanel
             {
                 if (horse.getDistanceTravelled() < trackLength) 
                 {
-                    horse.moveHorse(trackShape);
+                    horse.moveHorse(trackShape, weatherCondition);
                     allHorsesDone = false;
                 } 
                 else 
@@ -1139,7 +1419,7 @@ class RaceTrackPanel extends JPanel
                 boolean won = (i == 0);
                 boolean fell = false;  // These horses haven't fallen
                 
-                horse.updateConfidenceAfterRace(won, fell);
+                horse.updateConfidenceAfterRace(won, fell, weatherCondition);
                 
                 // Save confidence history
                 parentGUI.saveConfidenceHistory(horse, trackShape, i + 1, time, speed, confidenceBefore, horse.getConfidence());
@@ -1153,7 +1433,7 @@ class RaceTrackPanel extends JPanel
                 double speed = horse.getDistanceTravelled() / time;
                 double confidenceBefore = horse.getConfidence();
                 
-                horse.updateConfidenceAfterRace(false, true);
+                horse.updateConfidenceAfterRace(false, true, weatherCondition);
                 
                 // Save confidence history (fallen horses are placed after finishing horses)
                 parentGUI.saveConfidenceHistory(horse, trackShape, raceParticipants.size() + i + 1, time, speed, confidenceBefore, horse.getConfidence());
@@ -1177,6 +1457,52 @@ class RaceTrackPanel extends JPanel
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
         
+        // Drawing weather background effects 
+        if (weatherCondition.equals("Muddy")) 
+        {
+            g2d.setColor(new Color(139, 69, 19, 40));  // Very light brown tint
+            g2d.fillRect(0, 0, getWidth(), getHeight());
+            
+            // Drawing muddy patches
+            g2d.setColor(new Color(101, 67, 33, 60));  // Semi-transparent brown
+            for (int i = 0; i < 30; i++) 
+            {
+                int x = (i * 73) % getWidth();
+                int y = (i * 89) % getHeight();
+                g2d.fillOval(x, y, 60, 35);  // Muddy patches
+
+                g2d.setColor(new Color(82, 46, 23, 60));
+                g2d.fillOval(x + 15, y + 10, 30, 15);
+            }
+        } 
+        else if (weatherCondition.equals("Icy")) 
+        {
+            //Icy background
+            g2d.setColor(new Color(180, 200, 255, 150));  //Blue tint
+            g2d.fillRect(0, 0, getWidth(), getHeight());
+            
+            // Drawing ice patches
+            g2d.setColor(new Color(255, 255, 255, 100));  //White
+            for (int i = 0; i < 35; i++) 
+            {
+                int x = (i * 83) % getWidth();
+                int y = (i * 97) % getHeight();
+                
+                g2d.fillOval(x, y, 70, 40);
+                
+                //Ice shine effect
+                g2d.setColor(new Color(220, 240, 255, 120));
+                g2d.fillOval(x + 20, y + 10, 30, 20);
+                g2d.setColor(new Color(255, 255, 255, 100));
+            }
+        }
+
+        else if (weatherCondition.equals("Dry")) 
+        {
+            g2d.setColor(new Color(255, 253, 208, 50));  // Light warm yellow tint
+            g2d.fillRect(0, 0, getWidth(), getHeight());
+        }
+            
         int width = getWidth();
         int height = getHeight();
         
@@ -1194,10 +1520,6 @@ class RaceTrackPanel extends JPanel
         {
             drawStraightTrack(g, g2d, width, height);
         } 
-        else if (trackShape.equals("Zig-Zag")) 
-        {
-            // Implementation for Zig-Zag track
-        }
     }
 
     private void drawOvalTrack(Graphics g, Graphics2D g2d, int width, int height) 
@@ -1469,7 +1791,7 @@ class Horse
         this.falls = falls;
     }
 
-    public void updateConfidenceAfterRace(boolean wonRace, boolean fell) 
+    public void updateConfidenceAfterRace(boolean wonRace, boolean fell, String weatherCondition) 
     {
         double oldConfidence = horseConfidence; 
         double change;
@@ -1479,8 +1801,19 @@ class Horse
         } 
         else if (fell) 
         {
-            change = -0.15 * oldConfidence; // Bigger penalty if confidence was high
-        } 
+            if (weatherCondition.equals("Icy")) 
+            {
+                change = -0.05 * oldConfidence; 
+            } 
+            else if (weatherCondition.equals("Muddy")) 
+            {
+                change = -0.08 * oldConfidence; 
+            } 
+            else 
+            {
+                change = -0.15 * oldConfidence;
+            }
+        }
         else 
         {
             change = -0.05 * oldConfidence; // Small penalty for losing but not falling
@@ -1503,34 +1836,51 @@ class Horse
         return this.currentSpeed;
     }
 
-    public void moveHorse(String trackShape) 
+    public void moveHorse(String trackShape, String weatherCondition) 
     {
         if (hasFinished) return; // Preventing any further movement if finished
-
+    
+        // Weather effects
+        double speedModifier = 1.0;  
+        double fallRiskModifier = 1.0;      
+        
+        if (weatherCondition.equals("Muddy")) 
+        {
+            speedModifier = 0.7;  // 30% slower
+            fallRiskModifier = 2.0;  // Double fall risk
+        } 
+        else if (weatherCondition.equals("Icy")) 
+        {
+            speedModifier = 0.8;  // 20% slower
+            fallRiskModifier = 3.0;  // Triple fall risk
+        }
+    
         boolean inDecelZone = false;
-
+    
         if (trackShape.equals("Oval") && (progress >= 0.4 && progress <= 0.5)) 
         {
             inDecelZone = true;
         } 
-        else if (trackShape.equals("Figure-Eight") && (progress >= 0.45 && progress < 0.5 || progress >= 0.93 && progress < 0.99)) 
+        else if (trackShape.equals("Figure-Eight") && (progress >= 0.45 && progress < 0.5 || progress >= 0.95 && progress < 1.0)) 
         {
             inDecelZone = true;
         }
-
+    
         if (inDecelZone) 
         {
-            currentSpeed = Math.max(currentSpeed - acceleration*2, this.horseConfidence);
+            currentSpeed = Math.max(currentSpeed - acceleration*2, this.horseConfidence) * speedModifier;
         }
         else 
         {
-            double targetSpeed = 1.0 + (Math.random() * 8 * this.horseConfidence);
+            double targetSpeed = (1.0 + (Math.random() * 8 * this.horseConfidence)) * speedModifier;
             currentSpeed = Math.min(currentSpeed + acceleration, targetSpeed);
         }
     
         this.distanceTravelled += currentSpeed;
-
-        if (Math.random() < 0.0005 * Math.exp(this.horseConfidence)) 
+    
+        // Apply weather effects to falling chance
+        double weatherAdjustedFallRisk = 0.0001 * Math.exp(this.horseConfidence) * fallRiskModifier;
+        if (Math.random() < weatherAdjustedFallRisk) 
         {
             this.hasFallen = true;
         }
