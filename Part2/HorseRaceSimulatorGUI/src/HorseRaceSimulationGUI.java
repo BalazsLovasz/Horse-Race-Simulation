@@ -847,6 +847,13 @@ class StartRaceGUI extends JFrame
                                 int wins = trackWins.getOrDefault(track, 0);
                                 trackWinRates.put(track, (double)wins / races);
                             }
+
+                            // Fixed colors for each track type
+                            Map<String, Color> trackColors = new HashMap<>();
+                            trackColors.put("Oval", new Color(65, 105, 225));      
+                            trackColors.put("Straight", new Color(34, 139, 34));   
+                            trackColors.put("Figure-Eight", new Color(220, 20, 60)); 
+                            trackColors.put("Zig-Zag", new Color(148, 0, 211));    
                             
                             if (!trackWinRates.isEmpty()) 
                             {
@@ -857,12 +864,7 @@ class StartRaceGUI extends JFrame
                                 {
                                     int barHeight = (int)((height-100) * entry.getValue());
                                     
-                                    g.setColor(new Color(
-                                        (int)(Math.random() * 128) + 128,
-                                        (int)(Math.random() * 128) + 128,
-                                        (int)(Math.random() * 128) + 128
-                                    ));
-                                    
+                                    g.setColor(trackColors.getOrDefault(entry.getKey(), new Color(128, 128, 128)));
                                     g.fillRect(70 + i*barWidth, height-50-barHeight, barWidth-2, barHeight);
                                     
                                     g.setColor(Color.BLACK);
@@ -908,6 +910,188 @@ class StartRaceGUI extends JFrame
 
                 metricsPanel.setVisible(true);
                 viewMetricsButton.setText("Hide Metrics");
+
+
+                //Horse Comparison Tab
+                JPanel comparisonPanel = new JPanel(new BorderLayout());
+                comparisonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+                // Horse selection panel
+                JPanel selectionPanel = new JPanel(new FlowLayout());
+                JComboBox<String> horse1Selector = new JComboBox<>();
+                JComboBox<String> horse2Selector = new JComboBox<>();
+
+                // Populate horse selectors
+                for (Horse horse : allHorses) 
+                {
+                    horse1Selector.addItem(horse.getName());
+                    horse2Selector.addItem(horse.getName());
+                }
+
+                JButton compareButton = new JButton("Compare Horses");
+                compareButton.setBackground(new Color(70, 130, 180));
+                compareButton.setForeground(Color.WHITE);
+                compareButton.setFont(new Font("Arial", Font.BOLD, 14));
+
+                selectionPanel.add(new JLabel("Horse 1: "));
+                selectionPanel.add(horse1Selector);
+                selectionPanel.add(new JLabel("Horse 2: "));
+                selectionPanel.add(horse2Selector);
+                selectionPanel.add(compareButton);
+
+                // Results panel with grid layout
+                JPanel resultsPanel = new JPanel(new GridLayout(0, 3, 10, 5));
+                resultsPanel.setBorder(BorderFactory.createTitledBorder("Performance Comparison"));
+
+                compareButton.addActionListener(ey -> {
+                    resultsPanel.removeAll();
+                    
+                    // Get selected horses
+                    String name1 = (String) horse1Selector.getSelectedItem();
+                    String name2 = (String) horse2Selector.getSelectedItem();
+                    Horse horse1 = null;
+                    Horse horse2 = null;
+                    
+                    // Find selected horses in allHorses
+                    for (Horse horse : allHorses) 
+                    {
+                        if (horse.getName().equals(name1)) 
+                        {
+                            horse1 = horse;
+                        }
+                        if (horse.getName().equals(name2)) 
+                        {
+                            horse2 = horse;
+                        }
+                    }
+                    
+                    if (horse1 != null && horse2 != null) 
+                    {
+                        // Headers
+                        resultsPanel.add(new JLabel("Metric", SwingConstants.CENTER));
+                        resultsPanel.add(new JLabel(name1, SwingConstants.CENTER));
+                        resultsPanel.add(new JLabel(name2, SwingConstants.CENTER));
+                        
+                        // Statistics
+                        int totalRaces1 = horse1.getWins() + horse1.getLosses();
+                        int totalRaces2 = horse2.getWins() + horse2.getLosses();
+                        double winRate1 = totalRaces1 > 0 ? (double)horse1.getWins() / totalRaces1 * 100 : 0;
+                        double winRate2 = totalRaces2 > 0 ? (double)horse2.getWins() / totalRaces2 * 100 : 0;
+                        double fallRate1 = totalRaces1 > 0 ? (double)horse1.getFalls() / totalRaces1 * 100 : 0;
+                        double fallRate2 = totalRaces2 > 0 ? (double)horse2.getFalls() / totalRaces2 * 100 : 0;
+                        
+                        // Total Races
+                        resultsPanel.add(new JLabel("Total Races"));
+                        JLabel races1 = new JLabel(String.valueOf(totalRaces1), SwingConstants.CENTER);
+                        JLabel races2 = new JLabel(String.valueOf(totalRaces2), SwingConstants.CENTER);
+                        if (totalRaces1 > totalRaces2) 
+                        {
+                            races1.setForeground(new Color(0, 150, 0));
+                            races2.setForeground(Color.RED);
+                        } 
+                        else if (totalRaces2 > totalRaces1) 
+                        {
+                            races2.setForeground(new Color(0, 150, 0));
+                            races1.setForeground(Color.RED);
+                        }
+                        resultsPanel.add(races1);
+                        resultsPanel.add(races2);
+                        
+                        // Wins
+                        resultsPanel.add(new JLabel("Wins"));
+                        JLabel wins1 = new JLabel(String.valueOf(horse1.getWins()), SwingConstants.CENTER);
+                        JLabel wins2 = new JLabel(String.valueOf(horse2.getWins()), SwingConstants.CENTER);
+                        if (horse1.getWins() > horse2.getWins()) 
+                        {
+                            wins1.setForeground(new Color(0, 150, 0));
+                            wins2.setForeground(Color.RED);
+                        } 
+                        else if (horse2.getWins() > horse1.getWins()) 
+                        {
+                            wins2.setForeground(new Color(0, 150, 0));
+                            wins1.setForeground(Color.RED);
+                        }
+                        resultsPanel.add(wins1);
+                        resultsPanel.add(wins2);
+                        
+                        // Win Rate
+                        resultsPanel.add(new JLabel("Win Rate"));
+                        JLabel winRate1Label = new JLabel(String.format("%.1f%%", winRate1), SwingConstants.CENTER);
+                        JLabel winRate2Label = new JLabel(String.format("%.1f%%", winRate2), SwingConstants.CENTER);
+                        if (winRate1 > winRate2) 
+                        {
+                            winRate1Label.setForeground(new Color(0, 150, 0));
+                            winRate2Label.setForeground(Color.RED);
+                        } 
+                        else if (winRate2 > winRate1) 
+                        {
+                            winRate2Label.setForeground(new Color(0, 150, 0));
+                            winRate1Label.setForeground(Color.RED);
+                        }
+                        resultsPanel.add(winRate1Label);
+                        resultsPanel.add(winRate2Label);
+                        
+                        // Falls
+                        resultsPanel.add(new JLabel("Falls"));
+                        JLabel falls1 = new JLabel(String.valueOf(horse1.getFalls()), SwingConstants.CENTER);
+                        JLabel falls2 = new JLabel(String.valueOf(horse2.getFalls()), SwingConstants.CENTER);
+                        if (horse1.getFalls() < horse2.getFalls()) 
+                        {
+                            falls1.setForeground(new Color(0, 150, 0));
+                            falls2.setForeground(Color.RED);
+                        } 
+                        else if (horse2.getFalls() < horse1.getFalls()) 
+                        {
+                            falls2.setForeground(new Color(0, 150, 0));
+                            falls1.setForeground(Color.RED);
+                        }
+                        resultsPanel.add(falls1);
+                        resultsPanel.add(falls2);
+                        
+                        // Fall Rate
+                        resultsPanel.add(new JLabel("Fall Rate"));
+                        JLabel fallRate1Label = new JLabel(String.format("%.1f%%", fallRate1), SwingConstants.CENTER);
+                        JLabel fallRate2Label = new JLabel(String.format("%.1f%%", fallRate2), SwingConstants.CENTER);
+                        if (fallRate1 < fallRate2) 
+                        {
+                            fallRate1Label.setForeground(new Color(0, 150, 0));
+                            fallRate2Label.setForeground(Color.RED);
+                        } 
+                        else if (fallRate2 < fallRate1) 
+                        {
+                            fallRate2Label.setForeground(new Color(0, 150, 0));
+                            fallRate1Label.setForeground(Color.RED);
+                        }
+                        resultsPanel.add(fallRate1Label);
+                        resultsPanel.add(fallRate2Label);
+                        
+                        // Current Confidence
+                        resultsPanel.add(new JLabel("Current Confidence"));
+                        JLabel conf1 = new JLabel(String.format("%.2f", horse1.getConfidence()), SwingConstants.CENTER);
+                        JLabel conf2 = new JLabel(String.format("%.2f", horse2.getConfidence()), SwingConstants.CENTER);
+                        if (horse1.getConfidence() > horse2.getConfidence()) 
+                        {
+                            conf1.setForeground(new Color(0, 150, 0));
+                            conf2.setForeground(Color.RED);
+                        } 
+                        else if (horse2.getConfidence() > horse1.getConfidence()) 
+                        {
+                            conf2.setForeground(new Color(0, 150, 0));
+                            conf1.setForeground(Color.RED);
+                        }
+                        resultsPanel.add(conf1);
+                        resultsPanel.add(conf2);
+                    }
+                    
+                    resultsPanel.revalidate();
+                    resultsPanel.repaint();
+                });
+
+                comparisonPanel.add(selectionPanel, BorderLayout.NORTH);
+                comparisonPanel.add(new JScrollPane(resultsPanel), BorderLayout.CENTER);
+
+                // Add to main tabs
+                metricsTabs.addTab("Horse Comparison", comparisonPanel);
                 
                 // Force revalidation
                 metricsPanel.revalidate();
