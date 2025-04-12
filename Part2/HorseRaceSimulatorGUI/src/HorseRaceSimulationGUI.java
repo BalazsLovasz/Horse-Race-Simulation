@@ -51,7 +51,7 @@ class StartRaceGUI extends JFrame
     private JTextField[] horseConfidences = new JTextField[5];
 
     // Buttons
-    private JButton startRaceButton, restartButton, exitButton, viewMetricsButton;
+    private JButton readyButton, restartButton, exitButton, viewMetricsButton, placeBetsButton, startRaceButton;
     private RaceTrackPanel currentRacePanel;
 
     public StartRaceGUI()
@@ -159,8 +159,8 @@ class StartRaceGUI extends JFrame
     private void setupButtons() 
     {
         // Start Race Button
-        startRaceButton = createButton("Start Race", new Color(50, 150, 250), 16, 200);
-        startRaceButton.addActionListener(new StartRaceButtonListener());
+        readyButton = createButton("Ready", new Color(50, 150, 250), 16, 200);
+        readyButton.addActionListener(new ReadyButtonListener());
 
         // Exit Button
         exitButton = createButton("Exit Race", new Color(200, 100, 100), 14, 100);
@@ -177,12 +177,24 @@ class StartRaceGUI extends JFrame
         viewMetricsButton.addActionListener(new ViewMetricsButtonListener());
         viewMetricsButton.setVisible(false);
 
+        //startRaceButton
+        startRaceButton = createButton("Start Race", new Color(50, 205, 50), 14, 100);
+        startRaceButton.addActionListener(new StartRaceButtonListener());
+        startRaceButton.setVisible(false);
+
+        //placeBetsButton
+        placeBetsButton = createButton("Place Bets", new Color(200, 80, 180), 14, 100);
+        placeBetsButton.addActionListener(new PlaceBetsButtonListener());
+        placeBetsButton.setVisible(false);
+
         // Button Panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
-        buttonPanel.add(startRaceButton);
-        buttonPanel.add(restartButton);
+        buttonPanel.add(readyButton);
         buttonPanel.add(exitButton);
-        buttonPanel.add(viewMetricsButton);
+        buttonPanel.add(viewMetricsButton);        
+        buttonPanel.add(restartButton);
+        buttonPanel.add(placeBetsButton);
+        buttonPanel.add(startRaceButton);
         mainPanel.add(buttonPanel, BorderLayout.NORTH);
     }
 
@@ -285,8 +297,8 @@ class StartRaceGUI extends JFrame
         numberOfLanes = Integer.parseInt((String) laneCountList.getSelectedItem());
     }
 
-    // Action Listener for "Start Race" button
-    private class StartRaceButtonListener implements ActionListener 
+    // Action Listener for "Ready" button
+    private class ReadyButtonListener implements ActionListener 
     {
         @Override
         public void actionPerformed(ActionEvent e) 
@@ -358,30 +370,15 @@ class StartRaceGUI extends JFrame
             }
             
             horses = newHorses;
-            
-            //hide the customising panles
-            horsePanel.setVisible(false);
-            customisingPanel.setVisible(false);
-
-            // this create the graphical track panel
-            currentRacePanel = new RaceTrackPanel(trackShapeString, numberOfLanes, horses, trackLengthInteger, StartRaceGUI.this, weatherConditionString);
-            setCurrentRacePanel(currentRacePanel);
 
             // this updates the race display panel
+            readyButton.setVisible(false);
             customisingPanel.setVisible(false);
             horsePanel.setVisible(false);
-            startRaceButton.setVisible(false);
-            restartButton.setVisible(true);
             exitButton.setVisible(true);
             viewMetricsButton.setVisible(true);
-
-
-            mainPanel.add(currentRacePanel, BorderLayout.CENTER);  // Adds the new track panel
-            currentRacePanel.resetRace();
-
-            // Refresh the race display panel
-            mainPanel.revalidate();
-            mainPanel.repaint();
+            placeBetsButton.setVisible(true);
+            startRaceButton.setVisible(true);
         }
     }
     private class RestartButtonListener implements ActionListener
@@ -410,23 +407,28 @@ class StartRaceGUI extends JFrame
         @Override
         public void actionPerformed(ActionEvent e) 
         {
-            currentRacePanel.stopRace();
-
+            if (currentRacePanel != null) 
+            {
+                currentRacePanel.stopRace();
+                mainPanel.remove(currentRacePanel);
+            }
+    
             metricsPanel.setVisible(false);
             viewMetricsButton.setText("Metrics");
     
-            // 3. Reset button states
+            // Reseting button states
             customisingPanel.setVisible(true);
             horsePanel.setVisible(true);
-            startRaceButton.setVisible(true);
+            readyButton.setVisible(true);
             restartButton.setVisible(false);
             exitButton.setVisible(false);
             viewMetricsButton.setVisible(false);
+            startRaceButton.setVisible(false);
+            placeBetsButton.setVisible(false);
             
-            mainPanel.remove(currentRacePanel);
             mainPanel.revalidate();
             mainPanel.repaint();
-
+    
             updateHorseInputs();
         }
     }
@@ -476,7 +478,7 @@ class StartRaceGUI extends JFrame
                     
                     horseSubTabs.addTab("Basic Info", basicInfoPanel);
                         
-                        // 2. Performance Metrics Tab
+                    // 2. Performance Metrics Tab
                     JPanel performancePanel = new JPanel(new GridLayout(0, 2, 5, 5));
                     performancePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                     
@@ -498,20 +500,27 @@ class StartRaceGUI extends JFrame
                     double winPercentage = totalRaces > 0 ? (double) horse.getWins() / totalRaces * 100 : 0;
 
                     //Calculate average speed
-                    double raceTime = currentRacePanel.getHorseRaceTime(horse);
-                    String timeDisplay = raceTime > 0 ? String.format("%.2f seconds", raceTime) : "Did not finish";
+                    double raceTime = 0.0;
+                    String timeDisplay = "Not started";
+                    double averageSpeed = 0.0;
+
+                    if (currentRacePanel != null) 
+                    {
+                        raceTime = currentRacePanel.getHorseRaceTime(horse);
+                        timeDisplay = raceTime > 0 ? String.format("%.2f seconds", raceTime) : "Did not finish";
+                        if (raceTime > 0) 
+                        {
+                            averageSpeed = trackLengthInteger / raceTime;
+                        }
+                    }
+
                     performancePanel.add(new JLabel("Race Time:"));
                     performancePanel.add(new JLabel(timeDisplay));
-                    double averageSpeed = 0.0;
-                    if (raceTime > 0) 
-                    {
-                        averageSpeed = trackLengthInteger / raceTime;
-                    }
-                    
+
                     //Win percentage
                     performancePanel.add(new JLabel("Win Percentage:"));
                     performancePanel.add(new JLabel(String.format("%.1f%%", winPercentage)));
-                    
+
                     // Average speed
                     performancePanel.add(new JLabel("Average Speed:"));
                     performancePanel.add(new JLabel(String.format("%.2f m/s", averageSpeed)));
@@ -906,6 +915,21 @@ class StartRaceGUI extends JFrame
 
                     // Add this horse's complete tab set to the main metrics tabs
                     metricsTabs.addTab(horse.getName(), horseSubTabs);
+                    
+                    raceTime = 0.0;
+                    timeDisplay = "Not started";
+                    averageSpeed = 0.0;
+
+                    if (currentRacePanel != null) {
+                        raceTime = currentRacePanel.getHorseRaceTime(horse);
+                        timeDisplay = raceTime > 0 ? String.format("%.2f seconds", raceTime) : "Did not finish";
+                        if (raceTime > 0) {
+                            averageSpeed = trackLengthInteger / raceTime;
+                        }
+                    }
+
+                    performancePanel.add(new JLabel("Race Time:"));
+                    performancePanel.add(new JLabel(timeDisplay));
                 }
 
                 metricsPanel.setVisible(true);
@@ -1099,6 +1123,43 @@ class StartRaceGUI extends JFrame
                 mainPanel.revalidate();
                 mainPanel.repaint();
             }
+        }
+    }
+
+    private class StartRaceButtonListener implements ActionListener
+    {
+        @Override
+        public void actionPerformed(ActionEvent e) 
+        {
+            // this creates the graphical track panel
+            startRaceButton.setVisible(false);
+            placeBetsButton.setVisible(false);
+            metricsPanel.setVisible(false);
+            viewMetricsButton.setVisible(true);
+            restartButton.setVisible(true);
+    
+            currentRacePanel = new RaceTrackPanel(trackShapeString, numberOfLanes, horses, trackLengthInteger, StartRaceGUI.this, weatherConditionString);
+            setCurrentRacePanel(currentRacePanel);
+            
+            
+            
+            
+            // Add race panel and refresh display
+            mainPanel.add(currentRacePanel, BorderLayout.CENTER);
+            currentRacePanel.resetRace();
+            
+            mainPanel.revalidate();
+            mainPanel.repaint();
+
+        }
+    }
+
+    private class PlaceBetsButtonListener implements ActionListener
+    {
+        @Override
+        public void actionPerformed(ActionEvent e) 
+        {
+
         }
     }
 
@@ -2031,12 +2092,12 @@ class Horse
         if (weatherCondition.equals("Muddy")) 
         {
             speedModifier = 0.7;  // 30% slower
-            fallRiskModifier = 2.0;  // Double fall risk
+            fallRiskModifier = 1.3;  // Slight increase
         } 
         else if (weatherCondition.equals("Icy")) 
         {
             speedModifier = 0.8;  // 20% slower
-            fallRiskModifier = 3.0;  // Triple fall risk
+            fallRiskModifier = 1.6;  // Slight increase (more than muddy)
         }
     
         boolean inDecelZone = false;
@@ -2056,7 +2117,7 @@ class Horse
         }
         else 
         {
-            double targetSpeed = (1.0 + (Math.random() * 8 * this.horseConfidence)) * speedModifier;
+            double targetSpeed = (1.0 + (Math.random() * 5 * this.horseConfidence)) * speedModifier;
             currentSpeed = Math.min(currentSpeed + acceleration, targetSpeed);
         }
     
