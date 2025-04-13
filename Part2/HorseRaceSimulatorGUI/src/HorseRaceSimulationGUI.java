@@ -2761,7 +2761,7 @@ class Horse
         double baseSpeed = 1.0;  // Constant base speed instead of scaling with track length
         if (this.getSaddleType().equals("Racing Style")) 
         {
-            baseSpeed *= 1.2;  // 20% speed boost for racing saddle
+            baseSpeed *= 1.12;  // 20% speed boost for racing saddle
         }
 
         if (trackShape.equals("Oval") && (progress >= 0.4 && progress <= 0.5 || progress >= 0.9 && progress <= 1.0)) 
@@ -3090,7 +3090,8 @@ class BettingPanel extends JPanel
         // Horse selection
         centerPanel.add(new JLabel("Select Horse:"));
         horseSelector = new JComboBox<>();
-        for (Horse horse : horses) {
+        for (Horse horse : horses) 
+        {
             horseSelector.addItem(horse.getName());
         }
         centerPanel.add(horseSelector);
@@ -3127,7 +3128,7 @@ class BettingPanel extends JPanel
         public void removeUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
         public void insertUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
         });
-        
+
         updateOddsAndWinnings();
         return panel;
     }
@@ -3142,7 +3143,8 @@ class BettingPanel extends JPanel
         JTable statsTable = new JTable(model);
         
         // Populate table
-        for (Horse horse : horses) {
+        for (Horse horse : horses) 
+        {
             double odds = calculateOdds(horse);
             int totalBets = countBetsOnHorse(horse.getName());
             double totalAmount = calculateTotalBetsAmount(horse.getName());
@@ -3195,10 +3197,11 @@ class BettingPanel extends JPanel
     {
         JPanel panel = new JPanel(new BorderLayout());
         
-        // Create statistics panel
+        // Creating statistics panel 
         JPanel statsPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+        statsPanel.setBorder(BorderFactory.createTitledBorder("Betting Statistics"));
         
-        // Calculate statistics
+        // Calculating basic statistics
         int totalBets = parent.betHistory.size();
         long wonBets = parent.betHistory.stream().filter(Bet::isWon).count();
         double winRate = totalBets > 0 ? (double) wonBets / totalBets * 100 : 0;
@@ -3206,53 +3209,123 @@ class BettingPanel extends JPanel
             .mapToDouble(bet -> bet.isWon() ? bet.calculatePayout() - bet.getAmount() : -bet.getAmount())
             .sum();
         
-        // Add statistics
+        // more stats
+        double totalInvested = parent.betHistory.stream()
+            .mapToDouble(Bet::getAmount)
+            .sum();
+        
+        double avgBetAmount = parent.betHistory.stream()
+            .mapToDouble(Bet::getAmount)
+            .average()
+            .orElse(0);
+            
+        // Track performance by horse
+        Map<String, Integer> horseWins = new HashMap<>();
+        Map<String, Integer> horseBets = new HashMap<>();
+        
+        for (Bet bet : parent.betHistory) 
+        {
+            horseBets.merge(bet.getHorseName(), 1, Integer::sum);
+            if (bet.isWon()) 
+            {
+                horseWins.merge(bet.getHorseName(), 1, Integer::sum);
+            }
+        }
+        
+        // Adding statistics to panel
         statsPanel.add(new JLabel("Total Bets Placed:"));
         statsPanel.add(new JLabel(String.valueOf(totalBets)));
         statsPanel.add(new JLabel("Bets Won:"));
         statsPanel.add(new JLabel(String.valueOf(wonBets)));
         statsPanel.add(new JLabel("Win Rate:"));
         statsPanel.add(new JLabel(String.format("%.1f%%", winRate)));
+        statsPanel.add(new JLabel("Total Invested:"));
+        statsPanel.add(new JLabel(String.format("£%.2f", totalInvested)));
         statsPanel.add(new JLabel("Total Profit/Loss:"));
         statsPanel.add(new JLabel(String.format("£%.2f", totalWinnings)));
+        statsPanel.add(new JLabel("Average Bet Amount:"));
+        statsPanel.add(new JLabel(String.format("£%.2f", avgBetAmount)));
 
-        // Add betting pattern analysis
+        // Creating analysis area
         JTextArea analysisArea = new JTextArea();
         analysisArea.setEditable(false);
         analysisArea.setWrapStyleWord(true);
         analysisArea.setLineWrap(true);
         analysisArea.setMargin(new Insets(10, 10, 10, 10));
         
-        // Generate analysis text
+        // Generating analysis text
         StringBuilder analysis = new StringBuilder();
         analysis.append("Betting Pattern Analysis:\n\n");
-        if (totalBets > 0) {
-            if (winRate > 50) {
-                analysis.append("You're doing well! Your win rate is above 50%.\n");
-            } else {
-                analysis.append("Consider adjusting your betting strategy to improve your win rate.\n");
+        
+        if (totalBets > 0) 
+        {
+            if (winRate > 50) 
+            {
+                analysis.append("★ You're doing well! Your win rate is above 50%.\n");
+            } 
+            else 
+            {
+                analysis.append("! Consider adjusting your betting strategy to improve your win rate.\n");
             }
-            
-            // Add more specific advice based on betting patterns
-            double avgBetAmount = parent.betHistory.stream()
-                .mapToDouble(Bet::getAmount)
-                .average()
-                .orElse(0);
             
             analysis.append(String.format("\nAverage bet amount: £%.2f\n", avgBetAmount));
             
-            if (totalWinnings < 0) {
-                analysis.append("You're currently at a loss. Consider:\n");
+            // Adding horse-specific analysis
+            analysis.append("\nPerformance by Horse:\n");
+            horseBets.forEach((horseName, bets) -> 
+            {
+                int wins = horseWins.getOrDefault(horseName, 0);
+                double horseWinRate = (double) wins / bets * 100;
+                analysis.append(String.format("- %s: %d bets, %d wins (%.1f%% win rate)\n", 
+                    horseName, bets, wins, horseWinRate));
+            });
+            
+            // Financial advice
+            analysis.append("\nFinancial Analysis:\n");
+            if (totalWinnings < 0) 
+            {
+                analysis.append("! You're currently at a loss. Consider:\n");
                 analysis.append("- Setting a betting budget\n");
                 analysis.append("- Making smaller bets to extend your playing time\n");
                 analysis.append("- Studying horse performance patterns more carefully\n");
+                
+                if (avgBetAmount > totalInvested / 10) 
+                {
+                    analysis.append("- Your average bet might be too high. Consider reducing bet amounts\n");
+                }
+            } 
+            else 
+            {
+                analysis.append("★ You're in profit! Tips to maintain success:\n");
+                analysis.append("- Continue with your current betting amounts\n");
+                analysis.append("- Keep tracking horse performance\n");
+                analysis.append("- Consider increasing bets on your most successful horses\n");
             }
-        } else {
+            
+            // Find most successful horse
+            String bestHorse = horseBets.entrySet().stream()
+                .filter(e -> e.getValue() >= 3) // At least 3 bets
+                .max((e1, e2) -> {
+                    double rate1 = (double) horseWins.getOrDefault(e1.getKey(), 0) / e1.getValue();
+                    double rate2 = (double) horseWins.getOrDefault(e2.getKey(), 0) / e2.getValue();
+                    return Double.compare(rate1, rate2);
+                })
+                .map(Map.Entry::getKey)
+                .orElse(null);
+                
+            if (bestHorse != null) 
+            {
+                analysis.append(String.format("\nMost Successful Horse: %s\n", bestHorse));
+            }
+        } 
+        else 
+        {
             analysis.append("Place some bets to see betting pattern analysis.");
         }
         
         analysisArea.setText(analysis.toString());
 
+        // Add components to main panel
         panel.add(statsPanel, BorderLayout.NORTH);
         panel.add(new JScrollPane(analysisArea), BorderLayout.CENTER);
         
@@ -3396,6 +3469,12 @@ class BettingPanel extends JPanel
     private double calculateOdds(Horse horse) {
         // Your existing odds calculation code
         double baseOdds = 1.0 / horse.getConfidence();
+
+        // Calculate performance multiplier
+        int totalRaces = horse.getWins() + horse.getLosses();
+        double winRate = totalRaces > 0 ? (double) horse.getWins() / totalRaces : 0.5;
+        double confidenceImpact = horse.getConfidence() / 100.0;
+        double performanceMultiplier = 1.0 + (1.0 - winRate) + (1.0 - confidenceImpact);
         
         // Weather conditions adjustments
         if (weatherCondition.equals("Icy")) {
@@ -3436,12 +3515,27 @@ class BettingPanel extends JPanel
                 baseOdds *= 0.9;
             }
         }
+        else if (trackShape.equals("Oval")) {
+            if (horse.getBreed().getBreedName().equals("Clydesdale")) {
+                baseOdds *= 1.1;
+            } else if (horse.getBreed().getBreedName().equals("Thoroughbred")) {
+                baseOdds *= 0.8;
+            }
+        }
         
         // Recent performance adjustment
-        double winRate = (double) horse.getWins() / (horse.getWins() + horse.getLosses());
-        baseOdds *= (1.0 / (winRate + 0.1)); // Adding 0.1 to prevent division by zero
+        double recentTrendsMultiplier = 1.0;
+        if (totalRaces > 0)
+        {
+            double recentPerformance = (double) horse.getWins() / totalRaces;
+            double fallsPenalty = horse.getFalls() * 0.1;
+            recentTrendsMultiplier = 1.0 + (1.0 - recentPerformance) + fallsPenalty;
+        }
+        double finalOdds = baseOdds * performanceMultiplier * recentTrendsMultiplier;
         
-        return Math.round(baseOdds * 100.0) / 100.0; // Round to 2 decimal places
+        // Round to 2 decimal places
+        return Math.round(finalOdds * 100.0) / 100.0;
+    
     }
 }
 
