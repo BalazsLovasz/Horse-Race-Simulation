@@ -30,6 +30,8 @@ class StartRaceGUI extends JFrame
     private static final String CONFIDENCE_HISTORY_FILE = DATA_DIR + "/confidence_history.csv";
     private static final String TRACK_RECORDS_FILE = DATA_DIR + "/track_records.csv";
     private static final String BETS_HISTORY_FILE = DATA_DIR + "/bet_history.csv";
+    private static final String BALANCE_FILE = DATA_DIR + "/user_balance.txt";
+    private double userBalance = 1000.0; 
     ArrayList<Bet> betHistory = new ArrayList<>();
     ArrayList<Bet> currentBets = new ArrayList<>();
 
@@ -38,6 +40,7 @@ class StartRaceGUI extends JFrame
     private JPanel customisingPanel, mainPanel, horsePanel;
     private JPanel metricsPanel;
     private JTabbedPane metricsTabs;
+    private JLabel mainBalanceLabel;
 
     // Race Configuration Components
     private JComboBox<String> laneCountList, weatherCondition, trackShape, trackLengthList;
@@ -73,6 +76,8 @@ class StartRaceGUI extends JFrame
         // Set default track length before loading horses
         trackLengthInteger = Integer.parseInt((String) trackLengthList.getSelectedItem());
         loadHorsesFromCSV();
+        loadUserBalance();
+        loadBetHistory();
         horses = allHorses.toArray(new Horse[0]);
         setupFonts();
         updateHorseInputs();
@@ -166,8 +171,13 @@ class StartRaceGUI extends JFrame
 
     private void setupButtons() 
     {
+        mainBalanceLabel = new JLabel("Balance: £" + String.format("%.2f", userBalance));
+        mainBalanceLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        mainBalanceLabel.setForeground(new Color(50, 50, 50));
+        mainBalanceLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
+
         // Start Race Button
-        readyButton = createButton("Ready", new Color(50, 150, 250), 16, 250);
+        readyButton = createButton("Ready", new Color(50, 150, 250), 16, 200);
         readyButton.addActionListener(new ReadyButtonListener());
 
         // Exit Button
@@ -196,12 +206,15 @@ class StartRaceGUI extends JFrame
         placeBetsButton.setVisible(false);
 
         // View Bets History Button
-        viewBetsHistoryButton = createButton("View Bets History", new Color(150, 150, 200), 14, 200);
+        viewBetsHistoryButton = createButton("Bets History", new Color(150, 150, 200), 14, 120);
         viewBetsHistoryButton.addActionListener(new ViewBetsHistoryButtonListener());
         viewBetsHistoryButton.setVisible(true);  
 
         // Button Panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+
+        // Adding all components to button panel
+        buttonPanel.add(mainBalanceLabel);
         buttonPanel.add(readyButton);
         buttonPanel.add(exitButton);
         buttonPanel.add(viewMetricsButton);        
@@ -1372,6 +1385,41 @@ class StartRaceGUI extends JFrame
         }
     }
 
+    public void handleRaceCompletion(Horse winner) 
+    {
+        System.out.println("Processing bets for winner: " + winner.getName());
+        System.out.println("Current bets count: " + currentBets.size());
+        
+        // Update bet results based on winner
+        for (Bet bet : currentBets) 
+        {
+            boolean won = bet.getHorseName().equals(winner.getName());
+            bet.setWon(won);
+            if (won) 
+            {
+                // Calculate total winnings (bet amount * odds)
+                double totalWinnings = bet.getAmount() * bet.getOdds();
+                // First return the original bet amount
+                updateUserBalance(bet.getAmount());
+                // Then add the winnings
+                updateUserBalance(totalWinnings);
+                System.out.println("Bet won! Original bet: " + bet.getAmount() + 
+                                 ", Total winnings: " + totalWinnings);
+            }
+        }
+        
+        // Add current bets to history
+        betHistory.addAll(currentBets);
+        
+        // Save to file
+        saveBetsToFile();
+        
+        System.out.println("Total bets in history: " + betHistory.size());
+        
+        // Clear current bets for next race
+        currentBets.clear();
+    }
+
     public void saveHorsesToCSV() 
     {
         try 
@@ -1738,16 +1786,31 @@ class StartRaceGUI extends JFrame
 
     private void saveBetsToFile() 
     {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(BETS_HISTORY_FILE, true))) 
+        try 
         {
-            for (Bet bet : currentBets) 
+            // Create directory if it doesn't exist
+            File dataDir = new File(DATA_DIR);
+            if (!dataDir.exists() && !dataDir.mkdirs()) 
             {
-                writer.println(String.format("%s,%f,%f,%b,%s",
-                    bet.getHorseName(),
-                    bet.getAmount(),
-                    bet.getOdds(),
-                    bet.isWon(),
-                    bet.getTimestamp()));
+                throw new IOException("Could not create data directory");
+            }
+    
+            // Write to file
+            try (PrintWriter writer = new PrintWriter(new FileWriter(BETS_HISTORY_FILE))) 
+            {
+                // Write header if file is empty
+                writer.println("HorseName,Amount,Odds,Won,Timestamp");
+                
+                // Write all bet history
+                for (Bet bet : betHistory) 
+                {
+                    writer.println(String.format("%s,%f,%f,%b,%s",
+                        bet.getHorseName(),
+                        bet.getAmount(),
+                        bet.getOdds(),
+                        bet.isWon(),
+                        bet.getTimestamp()));
+                }
             }
         } 
         catch (IOException e) 
@@ -1760,17 +1823,28 @@ class StartRaceGUI extends JFrame
     
     public void loadBetHistory() 
     {
+        betHistory.clear(); // Clear existing history
+        
+        File file = new File(BETS_HISTORY_FILE);
+        if (!file.exists()) 
+        {
+            return; // No history file yet
+        }
+        
         try (BufferedReader reader = new BufferedReader(new FileReader(BETS_HISTORY_FILE))) 
         {
             String line;
+            // Skip header
+            reader.readLine();
             while ((line = reader.readLine()) != null) 
             {
                 String[] data = line.split(",");
-                if (data.length >= 5) 
-                {
-                    Bet bet = new Bet(data[0], 
-                        Double.parseDouble(data[1]),
-                        Double.parseDouble(data[2]));
+                if (data.length >= 5) {
+                    Bet bet = new Bet(
+                        data[0], // horseName
+                        Double.parseDouble(data[1]), // amount
+                        Double.parseDouble(data[2])  // odds
+                    );
                     bet.setWon(Boolean.parseBoolean(data[3]));
                     betHistory.add(bet);
                 }
@@ -1778,10 +1852,79 @@ class StartRaceGUI extends JFrame
         } 
         catch (IOException e) 
         {
-            // File might not exist yet, that's okay
+            JOptionPane.showMessageDialog(this, 
+                "Error loading bet history: " + e.getMessage(),
+                "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public double getUserBalance() 
+    {
+        return userBalance;
+    }
+    
+    public void updateUserBalance(double amount) 
+    {
+        userBalance += amount;
+        if (mainBalanceLabel != null) 
+        {
+            mainBalanceLabel.setText("Balance: £" + String.format("%.2f", userBalance));
+        }
+        saveUserBalance();
+    }
+    
+    private void saveUserBalance() 
+    {
+        try 
+        {
+            File dataDir = new File(DATA_DIR);
+            if (!dataDir.exists() && !dataDir.mkdirs()) 
+            {
+                throw new IOException("Could not create data directory");
+            }
+    
+            try (PrintWriter writer = new PrintWriter(new FileWriter(BALANCE_FILE))) 
+            {
+                writer.println(userBalance);
+            }
+        } 
+        catch (IOException e) 
+        {
+            JOptionPane.showMessageDialog(this, 
+                "Error saving user balance: " + e.getMessage(),
+                "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void loadUserBalance() 
+    {
+        File file = new File(BALANCE_FILE);
+        if (!file.exists()) 
+        {
+            userBalance = 1000.0; // Default starting balance
+        }
+        else 
+        {
+            try (BufferedReader reader = new BufferedReader(new FileReader(BALANCE_FILE))) 
+            {
+                String line = reader.readLine();
+                if (line != null) 
+                {
+                    userBalance = Double.parseDouble(line);
+                }
+            } 
+            catch (IOException | NumberFormatException e) 
+            {
+                userBalance = 1000.0; // Default to starting balance if there's an error
+            }
+        }
+        if (mainBalanceLabel != null) 
+        {
+            mainBalanceLabel.setText("Balance: £" + String.format("%.2f", userBalance));
         }
     }
 }
+
 
 class RaceTrackPanel extends JPanel 
 {
@@ -1971,6 +2114,7 @@ class RaceTrackPanel extends JPanel
                 {
                     horse.setWins(horse.getWins() + 1);
                     parentGUI.saveTrackRecord(trackShape, weatherCondition, time);
+                    parentGUI.handleRaceCompletion(horse);
                 } 
                 else 
                 {
@@ -2920,8 +3064,8 @@ class BettingPanel extends JPanel
     private String trackShape;
 
     public BettingPanel(Horse[] horses, String weatherCondition, String trackShape, 
-                       ArrayList<Bet> currentBets, ArrayList<Bet> betHistory,
-                       StartRaceGUI parent)
+                   ArrayList<Bet> currentBets, ArrayList<Bet> betHistory,
+                   StartRaceGUI parent)
     {
         this.parent = parent;
         this.horses = horses;
@@ -2933,8 +3077,9 @@ class BettingPanel extends JPanel
         
         // Top panel for balance and current bet info
         JPanel topPanel = new JPanel(new GridLayout(2, 1));
-        balanceLabel = new JLabel("Current Balance: £" + userBalance);
+        balanceLabel = new JLabel(); // Initialize the label first
         topPanel.add(balanceLabel);
+        balanceLabel.setText("Current Balance: £" + parent.getUserBalance()); // Now set the text
         
         // Center panel for horse selection and bet amount
         JPanel centerPanel = new JPanel(new GridLayout(2, 2, 5, 5));
@@ -3086,12 +3231,14 @@ class BettingPanel extends JPanel
         try 
         {
             double betAmount = Double.parseDouble(betAmountField.getText());
-            if (betAmount <= 0) {
+            if (betAmount <= 0) 
+            {
                 JOptionPane.showMessageDialog(this, "Please enter a valid bet amount.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
             
-            if (betAmount > userBalance) {
+            if (betAmount > parent.getUserBalance()) 
+            {
                 JOptionPane.showMessageDialog(this, "Insufficient balance.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -3114,8 +3261,8 @@ class BettingPanel extends JPanel
                 Bet newBet = new Bet(selectedHorse, betAmount, currentOdds);
                 
                 // Updating balance
-                userBalance -= betAmount;
-                balanceLabel.setText("Current Balance: $" + userBalance);
+                parent.updateUserBalance(-betAmount); // Subtract bet amount
+                balanceLabel.setText("Current Balance: £" + parent.getUserBalance());
                 
                 // Storing bet
                 parent.currentBets.add(newBet);
@@ -3126,7 +3273,6 @@ class BettingPanel extends JPanel
                 JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
                 frame.dispose();
             }
-            
         } 
         catch (NumberFormatException e) 
         {
