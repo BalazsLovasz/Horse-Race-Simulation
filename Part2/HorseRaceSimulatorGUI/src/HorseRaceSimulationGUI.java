@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 
 
 class StartRaceGUI extends JFrame 
@@ -28,7 +29,10 @@ class StartRaceGUI extends JFrame
     private static final String CSV_FILE = DATA_DIR + "/horse_data.csv";
     private static final String CONFIDENCE_HISTORY_FILE = DATA_DIR + "/confidence_history.csv";
     private static final String TRACK_RECORDS_FILE = DATA_DIR + "/track_records.csv";
-    
+    private static final String BETS_HISTORY_FILE = DATA_DIR + "/bet_history.csv";
+    ArrayList<Bet> betHistory = new ArrayList<>();
+    ArrayList<Bet> currentBets = new ArrayList<>();
+
 
     // Main Panels
     private JPanel customisingPanel, mainPanel, horsePanel;
@@ -54,7 +58,7 @@ class StartRaceGUI extends JFrame
     private JTextField[] horseConfidences = new JTextField[5];
 
     // Buttons
-    private JButton readyButton, restartButton, exitButton, viewMetricsButton, placeBetsButton, startRaceButton;
+    private JButton readyButton, restartButton, exitButton, viewMetricsButton, placeBetsButton, startRaceButton, viewBetsHistoryButton;
     private RaceTrackPanel currentRacePanel;
 
     public StartRaceGUI()
@@ -163,7 +167,7 @@ class StartRaceGUI extends JFrame
     private void setupButtons() 
     {
         // Start Race Button
-        readyButton = createButton("Ready", new Color(50, 150, 250), 16, 200);
+        readyButton = createButton("Ready", new Color(50, 150, 250), 16, 250);
         readyButton.addActionListener(new ReadyButtonListener());
 
         // Exit Button
@@ -191,6 +195,11 @@ class StartRaceGUI extends JFrame
         placeBetsButton.addActionListener(new PlaceBetsButtonListener());
         placeBetsButton.setVisible(false);
 
+        // View Bets History Button
+        viewBetsHistoryButton = createButton("View Bets History", new Color(150, 150, 200), 14, 200);
+        viewBetsHistoryButton.addActionListener(new ViewBetsHistoryButtonListener());
+        viewBetsHistoryButton.setVisible(true);  
+
         // Button Panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
         buttonPanel.add(readyButton);
@@ -199,6 +208,7 @@ class StartRaceGUI extends JFrame
         buttonPanel.add(restartButton);
         buttonPanel.add(placeBetsButton);
         buttonPanel.add(startRaceButton);
+        buttonPanel.add(viewBetsHistoryButton);
         mainPanel.add(buttonPanel, BorderLayout.NORTH);
     }
 
@@ -212,6 +222,7 @@ class StartRaceGUI extends JFrame
         button.setMargin(new Insets(2, 5, 2, 5));
         return button;
     }
+    
 
     private void setupFonts() 
     {
@@ -312,7 +323,7 @@ class StartRaceGUI extends JFrame
             columnPanel.add(horseColors[i]);
 
             // Horseshoe type combo box
-            horseshoeTypes[i] = new JComboBox<>(new String[]{"Standard", "Grip"});
+            horseshoeTypes[i] = new JComboBox<>(new String[]{"Standard", "Grip", "Spiked"});
             columnPanel.add(horseshoeTypes[i]);
 
             horseSaddles[i] = new JComboBox<>(new String[]{"Racing Style", "Western Style"});
@@ -438,7 +449,21 @@ class StartRaceGUI extends JFrame
         String selectedBreed = (String)horseBreeds[index].getSelectedItem();
         String selectedHorseshoe = (String)horseshoeTypes[index].getSelectedItem();
         HorseBreed breed = new HorseBreed(selectedBreed);
-        String symbol = breed.getBreedSymbol() + "-" + (selectedHorseshoe.equals("Grip") ? "G" : "S");
+        
+        String horseshoeSymbol;
+        if (selectedHorseshoe.equals("Grip")) 
+        {
+            horseshoeSymbol = "G";
+        } else if (selectedHorseshoe.equals("Spiked")) 
+        {
+            horseshoeSymbol = "P";
+        } 
+        else 
+        {
+            horseshoeSymbol = "S";
+        }
+        
+        String symbol = breed.getBreedSymbol() + "-" + horseshoeSymbol;
         horseSymbols[index].setText(symbol);
     }
 
@@ -1077,10 +1102,12 @@ class StartRaceGUI extends JFrame
                     timeDisplay = "Not started";
                     averageSpeed = 0.0;
 
-                    if (currentRacePanel != null) {
+                    if (currentRacePanel != null) 
+                    {
                         raceTime = currentRacePanel.getHorseRaceTime(horse);
                         timeDisplay = raceTime > 0 ? String.format("%.2f seconds", raceTime) : "Did not finish";
-                        if (raceTime > 0) {
+                        if (raceTime > 0) 
+                        {
                             averageSpeed = trackLengthInteger / raceTime;
                         }
                     }
@@ -1316,7 +1343,32 @@ class StartRaceGUI extends JFrame
         @Override
         public void actionPerformed(ActionEvent e) 
         {
+            // Load bet history first
+            loadBetHistory();
+            
+            // Create and show the betting panel
+            BettingPanel bettingPanel = new BettingPanel(horses, weatherConditionString, trackShapeString, currentBets, betHistory, StartRaceGUI.this);
+            
+            JFrame bettingFrame = new JFrame("Place Your Bets");
+            bettingFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            bettingFrame.add(bettingPanel);
+            bettingFrame.pack();
+            bettingFrame.setLocationRelativeTo(null);
+            bettingFrame.setVisible(true);
+        }
+    }
 
+    private class ViewBetsHistoryButtonListener implements ActionListener 
+    {
+        @Override
+        public void actionPerformed(ActionEvent e) 
+        {
+            JFrame historyFrame = new JFrame("Betting History");
+            BettingHistoryPanel historyPanel = new BettingHistoryPanel(betHistory);
+            historyFrame.add(historyPanel);
+            historyFrame.pack();
+            historyFrame.setLocationRelativeTo(null);
+            historyFrame.setVisible(true);
         }
     }
 
@@ -1431,7 +1483,8 @@ class StartRaceGUI extends JFrame
                             color = "Bay";
                         }
 
-                        String horseshoes = "Grip".equals(horseshoeType) ? "Grip" : "Standard";
+                        String horseshoes = horseshoeType.equals("Grip") ? "Grip" : 
+                                          horseshoeType.equals("Spiked") ? "Spiked" : "Standard";
                         
                         Horse horse = new Horse(name, confidence, trackLengthInteger, 
                                             breed, horseshoes, color, saddleType);
@@ -1681,6 +1734,52 @@ class StartRaceGUI extends JFrame
         int minutes = (int) (seconds / 60);
         double remainingSeconds = seconds % 60;
         return String.format("%d:%.2f", minutes, remainingSeconds);
+    }
+
+    private void saveBetsToFile() 
+    {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(BETS_HISTORY_FILE, true))) 
+        {
+            for (Bet bet : currentBets) 
+            {
+                writer.println(String.format("%s,%f,%f,%b,%s",
+                    bet.getHorseName(),
+                    bet.getAmount(),
+                    bet.getOdds(),
+                    bet.isWon(),
+                    bet.getTimestamp()));
+            }
+        } 
+        catch (IOException e) 
+        {
+            JOptionPane.showMessageDialog(this, 
+                "Error saving bet history: " + e.getMessage(),
+                "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    public void loadBetHistory() 
+    {
+        try (BufferedReader reader = new BufferedReader(new FileReader(BETS_HISTORY_FILE))) 
+        {
+            String line;
+            while ((line = reader.readLine()) != null) 
+            {
+                String[] data = line.split(",");
+                if (data.length >= 5) 
+                {
+                    Bet bet = new Bet(data[0], 
+                        Double.parseDouble(data[1]),
+                        Double.parseDouble(data[2]));
+                    bet.setWon(Boolean.parseBoolean(data[3]));
+                    betHistory.add(bet);
+                }
+            }
+        } 
+        catch (IOException e) 
+        {
+            // File might not exist yet, that's okay
+        }
     }
 }
 
@@ -2208,11 +2307,38 @@ class RaceTrackPanel extends JPanel
                 g2d.setColor(Color.LIGHT_GRAY);
             }
         } 
+        else if(horse.getHorseshoeType().equals("Spiked"))
+        {
+            // Spiked horseshoes 
+            g2d.setColor(new Color(192, 192, 192)); // Silver color
+            for (int i = 0; i < 4; i++) 
+            {
+                int hx = x - size/3 + (i * size/3);
+                int hy = y + size/4;
+                
+                // Drawing the base horseshoe
+                g2d.fillOval(hx - horseshoeSize/2, hy - horseshoeSize/2, horseshoeSize, horseshoeSize);
+                
+                // Drawing spikes
+                g2d.setColor(Color.DARK_GRAY);
+                g2d.setStroke(new BasicStroke(0.3f));
+                
+                // Draw three spikes per horseshoe
+                for (int j = 0; j < 3; j++) 
+                {
+                    int spikeX = hx - horseshoeSize/4 + (j * horseshoeSize/4);
+                    g2d.drawLine(spikeX, hy + horseshoeSize/4, spikeX, hy + horseshoeSize/2 -2);
+                    g2d.drawLine(spikeX, hy + horseshoeSize/2 - 2, spikeX - 1, hy + horseshoeSize/2 + 5);
+                    g2d.drawLine(spikeX, hy + horseshoeSize/2 - 2, spikeX + 1, hy + horseshoeSize/2 + 5);
+                }
+            }
+        } 
         else 
         {
             // Standard horseshoes - bronze colored
             g2d.setColor(new Color(205, 127, 50)); // Bronze color
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 4; i++) 
+            {
                 int hx = x - size/3 + (i * size/3);
                 int hy = y + size/4;
                 g2d.fillOval(hx - horseshoeSize/2, hy - horseshoeSize/2, horseshoeSize, horseshoeSize);
@@ -2303,6 +2429,12 @@ class Horse
     public String getHorseshoeType() 
     {
         return horseshoeType;
+    }
+
+    public void setHorseshoeType(String newHorseshoeType) 
+    {
+        this.horseshoeType = newHorseshoeType;
+        updateSymbol();  
     }
 
     public HorseBreed getBreed()
@@ -2468,7 +2600,11 @@ class Horse
             fallRiskModifier = 1.7;  
             if (horseshoeType.equals("Grip")) 
             {
-                fallRiskModifier *= 0.7;
+                fallRiskModifier *= 0.6;
+            }
+            else if(horseshoeType.equals("Spiked"))
+            {
+                fallRiskModifier *= 0.8;
             }
         } 
         else if (weatherCondition.equals("Icy")) 
@@ -2477,7 +2613,18 @@ class Horse
             fallRiskModifier = 2.0;  
             if (horseshoeType.equals("Grip")) 
             {
+                fallRiskModifier *= 0.8;
+            }
+            else if(horseshoeType.equals("Spiked"))
+            {
                 fallRiskModifier *= 0.6;
+            }
+        }
+        else if(weatherCondition.equals("Dry"))
+        {
+            if(horseshoeType.equals("Standard"))
+            {
+                fallRiskModifier *= 0.7;
             }
         }
 
@@ -2511,7 +2658,7 @@ class Horse
         this.distanceTravelled += currentSpeed;
 
         // Apply weather effects to falling chance
-        double weatherAdjustedFallRisk = 0.005 * Math.pow(this.horseConfidence, 2) * fallRiskModifier;
+        double weatherAdjustedFallRisk = 0.001 * Math.pow(this.horseConfidence, 2) * fallRiskModifier;
         if (Math.random() < weatherAdjustedFallRisk) 
         {
             this.hasFallen = true;
@@ -2759,7 +2906,344 @@ class CoatColor
     }
 }
 
+class BettingPanel extends JPanel 
+{
+    private StartRaceGUI parent;
+    private JTextField betAmountField;
+    private JComboBox<String> horseSelector;
+    private JLabel balanceLabel;
+    private JLabel oddsLabel;
+    private JLabel potentialWinningsLabel;
+    private double userBalance = 1000.0; // Starting balance
+    private Horse[] horses;
+    private String weatherCondition;
+    private String trackShape;
 
+    public BettingPanel(Horse[] horses, String weatherCondition, String trackShape, 
+                       ArrayList<Bet> currentBets, ArrayList<Bet> betHistory,
+                       StartRaceGUI parent)
+    {
+        this.parent = parent;
+        this.horses = horses;
+        this.weatherCondition = weatherCondition;
+        this.trackShape = trackShape;
+        
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Top panel for balance and current bet info
+        JPanel topPanel = new JPanel(new GridLayout(2, 1));
+        balanceLabel = new JLabel("Current Balance: £" + userBalance);
+        topPanel.add(balanceLabel);
+        
+        // Center panel for horse selection and bet amount
+        JPanel centerPanel = new JPanel(new GridLayout(2, 2, 5, 5));
+        
+        // Horse selection
+        centerPanel.add(new JLabel("Select Horse:"));
+        horseSelector = new JComboBox<>();
+        for (Horse horse : horses) {
+            horseSelector.addItem(horse.getName());
+        }
+        centerPanel.add(horseSelector);
+        
+        // Bet amount
+        centerPanel.add(new JLabel("Bet Amount:"));
+        betAmountField = new JTextField();
+        centerPanel.add(betAmountField);
+        
+        // Odds and potential winnings
+        centerPanel.add(new JLabel("Current Odds:"));
+        oddsLabel = new JLabel("Calculating...");
+        centerPanel.add(oddsLabel);
+        
+        centerPanel.add(new JLabel("Potential Winnings:"));
+        potentialWinningsLabel = new JLabel("£0.00");
+        centerPanel.add(potentialWinningsLabel);
+        
+        // Bottom panel for buttons
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton placeBetButton = new JButton("Place Bet");
+        JButton cancelButton = new JButton("Cancel");
+        
+        bottomPanel.add(placeBetButton);
+        bottomPanel.add(cancelButton);
+        
+        // Adding all panels to main panel
+        add(topPanel, BorderLayout.NORTH);
+        add(centerPanel, BorderLayout.CENTER);
+        add(bottomPanel, BorderLayout.SOUTH);
+        
+        // Adding listeners
+        horseSelector.addActionListener(e -> updateOddsAndWinnings());
+        betAmountField.addActionListener(e -> updateOddsAndWinnings());
+        
+        placeBetButton.addActionListener(e -> placeBet());
+        cancelButton.addActionListener(e -> {
+            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            frame.dispose();
+        });
+
+        parent.loadBetHistory();
+        
+        // Initialising update
+        updateOddsAndWinnings();
+    }
+    
+    private void updateOddsAndWinnings() 
+    {
+        String selectedHorseName = (String) horseSelector.getSelectedItem();
+        Horse selectedHorse = null;
+        for (Horse horse : horses) 
+        {
+            if (horse.getName().equals(selectedHorseName)) 
+            {
+                selectedHorse = horse;
+                break;
+            }
+        }
+        
+        if (selectedHorse != null) 
+        {
+            double odds = calculateOdds(selectedHorse);
+            oddsLabel.setText(String.format("%.2f", odds) + " to 1");
+            
+            try 
+            {
+                double betAmount = Double.parseDouble(betAmountField.getText());
+                double potentialWinnings = betAmount * odds;
+                potentialWinningsLabel.setText(String.format("£%.2f", potentialWinnings));
+            } 
+            catch (NumberFormatException e) 
+            {
+                potentialWinningsLabel.setText("£0.00");
+            }
+        }
+    }
+    
+    
+    private double calculateOdds(Horse horse) 
+    {
+        // Base odds is calculated based on horse's confidence
+        double baseOdds = 1.0 / horse.getConfidence();
+        
+        // Weather conditions adjustments
+        if (weatherCondition.equals("Icy")) {
+            if (horse.getHorseshoeType().equals("Standard")) {
+                baseOdds *= 1.5; // Worse performance
+            } else if (horse.getHorseshoeType().equals("Grip")) {
+                baseOdds *= 0.9; // Slightly better than standard
+            } else if (horse.getHorseshoeType().equals("Spiked")) {
+                baseOdds *= 0.7; // Best performance on ice
+            }
+        } else if (weatherCondition.equals("Muddy")) {
+            if (horse.getHorseshoeType().equals("Standard")) {
+                baseOdds *= 1.3; // Worse performance
+            } else if (horse.getHorseshoeType().equals("Grip")) {
+                baseOdds *= 0.7; // Better performance
+            } else if (horse.getHorseshoeType().equals("Spiked")) {
+                baseOdds *= 0.9; // Not ideal for mud
+            }
+        } else if (weatherCondition.equals("Dry")) {
+            if (horse.getHorseshoeType().equals("Standard")) {
+                baseOdds *= 0.9; // Good performance
+            } else if (horse.getHorseshoeType().equals("Grip")) {
+                baseOdds *= 1.1; // Slightly worse than standard
+            } else if (horse.getHorseshoeType().equals("Spiked")) {
+                baseOdds *= 1.3; // Worst performance on dry track
+            }
+        }
+        
+        // Track shape adjustments
+        if (trackShape.equals("Figure-Eight")) 
+        {
+            if (horse.getBreed().getBreedName().equals("Clydesdale")) 
+            {
+                baseOdds *= 1.1; 
+            } 
+            else if (horse.getBreed().getBreedName().equals("Thoroughbred")) 
+            {
+                baseOdds *= 0.8; 
+            }
+        } 
+        else if (trackShape.equals("Straight")) 
+        {
+            if (horse.getBreed().getBreedName().equals("Thoroughbred")) 
+            {
+                baseOdds *= 0.9; 
+            }
+        }
+        
+        // Recent performance adjustment
+        double winRate = (double) horse.getWins() / (horse.getWins() + horse.getLosses());
+        baseOdds *= (1.0 / (winRate + 0.1)); // Adding 0.1 to prevent division by zero
+        
+        return Math.round(baseOdds * 100.0) / 100.0; // Round to 2 decimal places
+    }
+    
+    private void placeBet() 
+    {
+        try 
+        {
+            double betAmount = Double.parseDouble(betAmountField.getText());
+            if (betAmount <= 0) {
+                JOptionPane.showMessageDialog(this, "Please enter a valid bet amount.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            if (betAmount > userBalance) {
+                JOptionPane.showMessageDialog(this, "Insufficient balance.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            // Create new bet
+            String selectedHorse = (String)horseSelector.getSelectedItem();
+            Horse horse = null;
+            for (Horse h : horses) 
+            {
+                if (h.getName().equals(selectedHorse)) 
+                {
+                    horse = h;
+                    break;
+                }
+            }
+            
+            if (horse != null) 
+            {
+                double currentOdds = calculateOdds(horse);
+                Bet newBet = new Bet(selectedHorse, betAmount, currentOdds);
+                
+                // Updating balance
+                userBalance -= betAmount;
+                balanceLabel.setText("Current Balance: $" + userBalance);
+                
+                // Storing bet
+                parent.currentBets.add(newBet);
+                
+                JOptionPane.showMessageDialog(this, "Bet placed successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                
+                // Close the betting window
+                JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+                frame.dispose();
+            }
+            
+        } 
+        catch (NumberFormatException e) 
+        {
+            JOptionPane.showMessageDialog(this, "Please enter a valid bet amount.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+}
+
+class Bet 
+{
+    private String horseName;
+    private double amount;
+    private double odds;
+    private boolean won;
+    private String timestamp;
+
+    public Bet(String horseName, double amount, double odds) 
+    {
+        this.horseName = horseName;
+        this.amount = amount;
+        this.odds = odds;
+        this.timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        this.won = false;
+    }
+
+    // Getters and setters
+    public String getHorseName() { return horseName; }
+    public double getAmount() { return amount; }
+    public double getOdds() { return odds; }
+    public boolean isWon() { return won; }
+    public String getTimestamp() { return timestamp; }
+    public void setWon(boolean won) { this.won = won; }
+
+    public double calculatePayout() 
+    {
+        return won ? amount * odds : 0;
+    }
+}
+
+class BettingHistoryPanel extends JPanel 
+{
+    private JTable historyTable;
+    private DefaultTableModel tableModel;
+    private JLabel totalWinningsLabel;
+    private JLabel bettingStatsLabel;
+
+    public BettingHistoryPanel(ArrayList<Bet> betHistory)
+    {
+        setLayout(new BorderLayout());
+        
+        // Create table model with columns
+        String[] columnNames = {"Date", "Horse", "Amount", "Odds", "Result", "Payout"};
+        tableModel = new DefaultTableModel(columnNames, 0);
+        historyTable = new JTable(tableModel);
+        
+        // Add table to scroll pane
+        JScrollPane scrollPane = new JScrollPane(historyTable);
+        add(scrollPane, BorderLayout.CENTER);
+        
+        // Create stats panel
+        JPanel statsPanel = new JPanel(new GridLayout(2, 1));
+        totalWinningsLabel = new JLabel("Total Winnings: $0.00");
+        bettingStatsLabel = new JLabel("Betting Statistics: ");
+        statsPanel.add(totalWinningsLabel);
+        statsPanel.add(bettingStatsLabel);
+        add(statsPanel, BorderLayout.SOUTH);
+        
+        // Load history data
+        loadHistoryData(betHistory);
+        updateStats(betHistory);
+    }
+    
+    private void loadHistoryData(ArrayList<Bet> betHistory) 
+    {
+        tableModel.setRowCount(0); // Clear existing data
+        for (Bet bet : betHistory) {
+            Object[] rowData = {
+                bet.getTimestamp(),
+                bet.getHorseName(),
+                String.format("$%.2f", bet.getAmount()),
+                String.format("%.2f", bet.getOdds()),
+                bet.isWon() ? "Won" : "Lost",
+                String.format("$%.2f", bet.calculatePayout())
+            };
+            tableModel.addRow(rowData);
+        }
+    }
+    
+    private void updateStats(ArrayList<Bet> betHistory) 
+    {
+        double totalWinnings = 0;
+        int totalBets = betHistory.size();
+        int wonBets = 0;
+        
+        for (Bet bet : betHistory) 
+        {
+            if (bet.isWon()) 
+            {
+                totalWinnings += bet.calculatePayout() - bet.getAmount();
+                wonBets++;
+            } 
+            else 
+            {
+                totalWinnings -= bet.getAmount();
+            }
+        }
+        
+        totalWinningsLabel.setText(String.format("Total Winnings: $%.2f", totalWinnings));
+        
+        if (totalBets > 0) 
+        {
+            double winRate = (double) wonBets / totalBets * 100;
+            bettingStatsLabel.setText(String.format("Betting Statistics: Won %d out of %d bets (%.1f%%)", 
+                wonBets, totalBets, winRate));
+        }
+    }
+}
 
 class HorseRaceSimulationGUI
 {
