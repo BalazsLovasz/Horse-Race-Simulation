@@ -2465,24 +2465,28 @@ class Horse
         if (weatherCondition.equals("Muddy")) 
         {
             speedModifier = 0.7;  // 30% slower
-            fallRiskModifier = 1.3;  
+            fallRiskModifier = 1.7;  
             if (horseshoeType.equals("Grip")) 
             {
-                fallRiskModifier *= 0.8;
+                fallRiskModifier *= 0.7;
             }
         } 
         else if (weatherCondition.equals("Icy")) 
         {
             speedModifier = 0.8;  // 20% slower
-            fallRiskModifier = 1.6;  
+            fallRiskModifier = 2.0;  
             if (horseshoeType.equals("Grip")) 
             {
-                fallRiskModifier *= 0.7;
+                fallRiskModifier *= 0.6;
             }
         }
 
         boolean inDecelZone = false;
         double baseSpeed = 1.0;  // Constant base speed instead of scaling with track length
+        if (this.getSaddleType().equals("Racing Style")) 
+        {
+            baseSpeed *= 1.2;  // 20% speed boost for racing saddle
+        }
 
         if (trackShape.equals("Oval") && (progress >= 0.4 && progress <= 0.5 || progress >= 0.9 && progress <= 1.0)) 
         {
@@ -2495,7 +2499,7 @@ class Horse
 
         if (inDecelZone) 
         {
-            currentSpeed = Math.max(currentSpeed - acceleration*2, this.horseConfidence * baseSpeed);
+            currentSpeed = Math.max(currentSpeed - acceleration*1.7, this.horseConfidence * baseSpeed);
         }
         else 
         {
@@ -2507,7 +2511,7 @@ class Horse
         this.distanceTravelled += currentSpeed;
 
         // Apply weather effects to falling chance
-        double weatherAdjustedFallRisk = 0.001 * Math.pow(this.horseConfidence, 2) * fallRiskModifier;
+        double weatherAdjustedFallRisk = 0.005 * Math.pow(this.horseConfidence, 2) * fallRiskModifier;
         if (Math.random() < weatherAdjustedFallRisk) 
         {
             this.hasFallen = true;
