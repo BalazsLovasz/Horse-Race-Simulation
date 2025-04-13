@@ -10,6 +10,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -3075,62 +3077,222 @@ class BettingPanel extends JPanel
 
     private JPanel createPlaceBetsTab() 
     {
-        JPanel panel = new JPanel(new BorderLayout());
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Top panel for balance
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        // Top panel for  and quick bet buttons
+        JPanel topPanel = new JPanel(new BorderLayout());
+        
+        // Balance panel
+        JPanel balancePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         balanceLabel = new JLabel("Current Balance: £" + String.format("%.2f", parent.getUserBalance()));
         balanceLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        topPanel.add(balanceLabel);
-
-        // Center panel for betting inputs
-        JPanel centerPanel = new JPanel(new GridLayout(4, 2, 5, 5));
+        balancePanel.add(balanceLabel);
         
-        // Horse selection
-        centerPanel.add(new JLabel("Select Horse:"));
+        // Quick bet buttons
+        JPanel quickBetPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton bet5Button = createQuickBetButton("Bet £10", 10.0);
+        JButton bet10Button = createQuickBetButton("Bet £100", 100.0);
+        JButton bet20Button = createQuickBetButton("Bet £1000", 1000.0);
+        quickBetPanel.add(bet5Button);
+        quickBetPanel.add(bet10Button);
+        quickBetPanel.add(bet20Button);
+        
+        topPanel.add(balancePanel, BorderLayout.WEST);
+        topPanel.add(quickBetPanel, BorderLayout.EAST);
+
+        // Center panel with horse cards and betting inputs
+        JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
+        
+        // Betting controls panel - Now on the LEFT
+        JPanel bettingControlsPanel = new JPanel(new GridLayout(4, 2, 5, 5));
+        bettingControlsPanel.setBorder(BorderFactory.createTitledBorder("Place Your Bet"));
+        
+        // Horse selection dropdown
+        bettingControlsPanel.add(new JLabel("Selected Horse:"));
         horseSelector = new JComboBox<>();
         for (Horse horse : horses) 
         {
             horseSelector.addItem(horse.getName());
         }
-        centerPanel.add(horseSelector);
+        bettingControlsPanel.add(horseSelector);
         
-        // Bet amount
-        centerPanel.add(new JLabel("Bet Amount:"));
+        // Bet amount with validation
+        bettingControlsPanel.add(new JLabel("Bet Amount:"));
+        JPanel betAmountPanel = new JPanel(new BorderLayout(5, 0));
         betAmountField = new JTextField();
-        centerPanel.add(betAmountField);
+        betAmountField.setToolTipText("Enter bet amount");
+        JLabel currencyLabel = new JLabel("£");
+        betAmountPanel.add(currencyLabel, BorderLayout.WEST);
+        betAmountPanel.add(betAmountField, BorderLayout.CENTER);
+        bettingControlsPanel.add(betAmountPanel);
         
         // Odds display
-        centerPanel.add(new JLabel("Current Odds:"));
+        bettingControlsPanel.add(new JLabel("Current Odds:"));
         oddsLabel = new JLabel("Calculating...");
-        centerPanel.add(oddsLabel);
+        bettingControlsPanel.add(oddsLabel);
         
         // Potential winnings
-        centerPanel.add(new JLabel("Potential Winnings:"));
+        bettingControlsPanel.add(new JLabel("Potential Winnings:"));
         potentialWinningsLabel = new JLabel("£0.00");
-        centerPanel.add(potentialWinningsLabel);
+        potentialWinningsLabel.setForeground(new Color(0, 150, 0));
+        bettingControlsPanel.add(potentialWinningsLabel);
 
-        // Bottom panel for buttons
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        // Horse selection panel with detailed cards - Now on the RIGHT
+        JPanel horseCardsPanel = new JPanel(new GridLayout(0, 2, 10, 10));
+        horseCardsPanel.setBorder(BorderFactory.createTitledBorder("Available Horses"));
+        
+        for (Horse horse : horses) 
+        {
+            JPanel horseCard = createHorseCard(horse);
+            horseCardsPanel.add(horseCard);
+        }
+
+        // Add panels to center panel - SWAPPED ORDER HERE
+        centerPanel.add(bettingControlsPanel, BorderLayout.WEST);
+        centerPanel.add(horseCardsPanel, BorderLayout.CENTER);
+
+        // Bottom panel for action buttons
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         JButton placeBetButton = new JButton("Place Bet");
+        placeBetButton.setFont(new Font("Arial", Font.BOLD, 14));
+        placeBetButton.setBackground(new Color(50, 205, 50));
+        placeBetButton.setForeground(Color.WHITE);
         placeBetButton.addActionListener(e -> placeBet());
+        
+        JButton clearButton = new JButton("Clear");
+        clearButton.addActionListener(e -> clearBetForm());
+        
         bottomPanel.add(placeBetButton);
+        bottomPanel.add(clearButton);
 
+        // Add all panels to main panel
         panel.add(topPanel, BorderLayout.NORTH);
         panel.add(centerPanel, BorderLayout.CENTER);
         panel.add(bottomPanel, BorderLayout.SOUTH);
 
         // Add listeners
         horseSelector.addActionListener(e -> updateOddsAndWinnings());
-        betAmountField.getDocument().addDocumentListener(new DocumentListener() {
-        public void changedUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
-        public void removeUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
-        public void insertUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
+        betAmountField.getDocument().addDocumentListener(new DocumentListener() 
+        {
+            public void changedUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
+            public void removeUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
+            public void insertUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
         });
 
         updateOddsAndWinnings();
         return panel;
+    }
+
+    private JPanel createHorseCard(Horse horse) 
+    {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        card.setBackground(Color.WHITE);
+        
+        // Horse name
+        JLabel nameLabel = new JLabel(horse.getName());
+        nameLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        // Horse stats
+        JLabel statsLabel = new JLabel(String.format(
+            "<html><center>Wins: %d<br>Losses: %d<br>Confidence: %.0f%%</center></html>",
+            horse.getWins(), horse.getLosses(), horse.getConfidence()
+        ));
+        statsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        // Current odds
+        JLabel oddsLabel = new JLabel(String.format("Odds: %.2f:1", calculateOdds(horse)));
+        oddsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        // Add components
+        card.add(Box.createVerticalStrut(5));
+        card.add(nameLabel);
+        card.add(Box.createVerticalStrut(5));
+        card.add(statsLabel);
+        card.add(Box.createVerticalStrut(5));
+        card.add(oddsLabel);
+        card.add(Box.createVerticalStrut(5));
+        
+        // Make card clickable to select horse
+        card.addMouseListener(new MouseAdapter() 
+        {
+            @Override
+            public void mouseClicked(MouseEvent e) 
+            {
+                horseSelector.setSelectedItem(horse.getName());
+            }
+            
+            @Override
+            public void mouseEntered(MouseEvent e) 
+            {
+                card.setBackground(new Color(240, 240, 240));
+            }
+            
+            @Override
+            public void mouseExited(MouseEvent e) 
+            {
+                card.setBackground(Color.WHITE);
+            }
+        });
+        
+        return card;
+    }
+
+    private JButton createQuickBetButton(String text, double amount) 
+    {
+        JButton button = new JButton(text);
+        button.addActionListener(e -> 
+        {
+            betAmountField.setText(String.format("%.2f", amount));
+            updateOddsAndWinnings();
+        });
+        return button;
+    }
+
+    private void validateBetAmount() 
+    {
+        try 
+        {
+            String text = betAmountField.getText().trim();
+            if (!text.isEmpty()) 
+            {
+                double amount = Double.parseDouble(text);
+                if (amount <= 0) 
+                {
+                    betAmountField.setText("");
+                    JOptionPane.showMessageDialog(this, 
+                        "Please enter a positive bet amount.", 
+                        "Invalid Bet", 
+                        JOptionPane.WARNING_MESSAGE);
+                } 
+                else if (amount > parent.getUserBalance()) 
+                {
+                    betAmountField.setText("");
+                    JOptionPane.showMessageDialog(this, 
+                        "Bet amount exceeds your current balance.", 
+                        "Insufficient Funds", 
+                        JOptionPane.WARNING_MESSAGE);
+                }
+            }
+        } 
+        catch (NumberFormatException ex) 
+        {
+            betAmountField.setText("");
+            JOptionPane.showMessageDialog(this, 
+                "Please enter a valid number.", 
+                "Invalid Input", 
+                JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private void clearBetForm() 
+    {
+        betAmountField.setText("");
+        horseSelector.setSelectedIndex(0);
+        updateOddsAndWinnings();
     }
 
     private JPanel createCurrentRaceStatsTab() 
