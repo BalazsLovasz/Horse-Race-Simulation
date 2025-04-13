@@ -246,12 +246,47 @@ class StartRaceGUI extends JFrame
 
         int numLanes = Integer.parseInt((String) laneCountList.getSelectedItem());
 
+        // Create default horses for new lanes if needed
+        if (horses.length < numLanes) 
+        {
+            String[] defaultNames = {"Thunder", "Storm", "Lightning", "Bolt", "Flash"};
+            String[] defaultBreeds = {HorseBreed.THOROUGHBRED, HorseBreed.ARABIAN, 
+                                    HorseBreed.QUARTER_HORSE, HorseBreed.CLYDESDALE, 
+                                    HorseBreed.APPALOOSA};
+            String[] defaultColors = {CoatColor.BAY, CoatColor.BLACK, CoatColor.CHESTNUT, 
+                                    CoatColor.WHITE, CoatColor.GREY};
+            
+            Horse[] newHorses = new Horse[numLanes];
+            // Copy existing horses
+            for (int i = 0; i < horses.length; i++) 
+            {
+                newHorses[i] = horses[i];
+            }
+            
+            // Add new default horses
+            for (int i = horses.length; i < numLanes; i++) 
+            {
+                int index = i % defaultNames.length;
+                Horse newHorse = new Horse(
+                    defaultNames[index], 
+                    0.4 + (Math.random() * 0.2),
+                    trackLengthInteger,
+                    defaultBreeds[index], 
+                    "Standard", 
+                    defaultColors[index], 
+                    "Racing Style"
+                );
+                newHorses[i] = newHorse;
+                allHorses.add(newHorse);
+            }
+            horses = newHorses;
+        }
         for (int i = 0; i < numLanes; i++) 
         {
             JPanel columnPanel = new JPanel(new GridLayout(0, 1, 0, 5));
 
             // Name field
-            horseNames[i] = new JTextField(horses[i] != null ? horses[i].getName() : "Horse" + (i + 1));
+            horseNames[i] = new JTextField(horses[i] != null ? horses[i].getName() : "");            
             columnPanel.add(horseNames[i]);
 
             // Breed combo box
@@ -314,32 +349,65 @@ class StartRaceGUI extends JFrame
             Runnable updateFields = () -> 
             {
                 String horseName = horseNames[index].getText().trim();
+                if (horseName.isEmpty()) {
+                    return;
+                }
+
+                // Check if this is a new name
+                boolean isNewName = true;
                 Horse foundHorse = null;
                 for (Horse h : allHorses) 
                 {
                     if (h.getName().equals(horseName)) 
                     {
+                        isNewName = false;
                         foundHorse = h;
                         break;
                     }
                 }
                 
-                if (foundHorse != null) 
+                if (isNewName) 
                 {
-                    horseConfidences[index].setText(String.format("%.2f", foundHorse.getConfidence()));
+                    // Create new horse with current selections
+                    String selectedBreed = (String)horseBreeds[index].getSelectedItem();
+                    String selectedColor = (String)horseColors[index].getSelectedItem();
+                    String selectedHorseshoe = (String)horseshoeTypes[index].getSelectedItem();
+                    String selectedSaddle = (String)horseSaddles[index].getSelectedItem();
                     
-                    String breedName = foundHorse.getBreed().getBreedName();
-                    String colorName = foundHorse.getCoatColor().getColorName();
-                    String horseshoeType = foundHorse.getHorseshoeType();
-                    String saddleType = foundHorse.getSaddleType();
+                    Horse newHorse = new Horse(
+                        horseName,
+                        0.7 + (Math.random() * 0.2),
+                        trackLengthInteger,
+                        selectedBreed,
+                        selectedHorseshoe,
+                        selectedColor,
+                        selectedSaddle
+                    );
                     
-                    horseBreeds[index].setSelectedItem(breedName);
-                    horseColors[index].setSelectedItem(colorName);
-                    horseshoeTypes[index].setSelectedItem(horseshoeType);
-                    horseSaddles[index].setSelectedItem(saddleType);
+                    // Replace the old horse in allHorses
+                    allHorses.remove(horses[index]);  // Remove horse at this position
+                    allHorses.add(newHorse);          // Add the new horse
+                    horses[index] = newHorse;         // Update the current race lineup
+                    
+                    horseConfidences[index].setText(String.format("%.2f", newHorse.getConfidence()));
                     updateSymbolFromSelections(index);
                 }
-                
+                else if (foundHorse != null)
+                {
+                    // Use existing horse's values
+                    horseConfidences[index].setText(String.format("%.2f", foundHorse.getConfidence()));
+                    horseBreeds[index].setSelectedItem(foundHorse.getBreed().getBreedName());
+                    horseColors[index].setSelectedItem(foundHorse.getCoatColor().getColorName());
+                    horseshoeTypes[index].setSelectedItem(foundHorse.getHorseshoeType());
+                    horseSaddles[index].setSelectedItem(foundHorse.getSaddleType());
+                    
+                    // Replace the old horse in allHorses
+                    allHorses.remove(horses[index]);  // Remove horse at this position
+                    allHorses.add(foundHorse);        // Add the found horse
+                    horses[index] = foundHorse;       // Update the current race lineup
+                    
+                    updateSymbolFromSelections(index);
+                }
             };
 
             ActionListener symbolUpdater = e -> updateSymbolFromSelections(index);
@@ -380,6 +448,7 @@ class StartRaceGUI extends JFrame
         @Override
         public void actionPerformed(ActionEvent e) 
         {
+            saveHorsesToCSV();
             metricsPanel.setVisible(false);
             viewMetricsButton.setText("Metrics");
 
@@ -1266,7 +1335,7 @@ class StartRaceGUI extends JFrame
                 writer.println("Name,Symbol,Confidence,Wins,Losses,Falls,Breed,HorseshoeType,CoatColor,SaddleType");
                 for (Horse horse : allHorses) 
                 {
-                    writer.println(String.format("%s,%s,%.2f,%d,%d,%d,%s,%s,%s",
+                    writer.println(String.format("%s,%s,%.2f,%d,%d,%d,%s,%s,%s,%s",
                         horse.getName(),
                         horse.getSymbol(),
                         horse.getConfidence(),
@@ -1295,13 +1364,17 @@ class StartRaceGUI extends JFrame
     {
         if (trackLengthInteger <= 0) 
         {
-           return;
+            return;
         }
 
+        allHorses = new ArrayList<>(); // Initialising the list
         File file = new File(CSV_FILE);
+        
+        // If file doesn't exist, start with empty array
         if (!file.exists()) 
         {
             System.out.println("No existing horse data file found at: " + file.getAbsolutePath());
+            horses = new Horse[0];
             return;
         }
 
@@ -1309,79 +1382,90 @@ class StartRaceGUI extends JFrame
         {
             String line;
             reader.readLine(); // Skip header
-            allHorses.clear(); // Clear existing horses
             
             while ((line = reader.readLine()) != null) 
             {
                 String[] data = line.split(",");
-                // Changed condition from >= 10 to >= 9
                 if (data.length >= 9) 
                 {
-                    String name = data[0].trim();
-                    double confidence = Double.parseDouble(data[2]);
-                    int wins = Integer.parseInt(data[3]);
-                    int losses = Integer.parseInt(data[4]);
-                    int falls = Integer.parseInt(data[5]);
-                    String breedName = data[6].trim();
-                    String horseshoeType = data[7].trim();
-                    String coatColor = data[8].trim();
-                    String saddleType = "Racing Style";  // Default saddle type
+                    try {
+                        String name = data[0].trim();
+                        double confidence = Double.parseDouble(data[2]);
+                        int wins = Integer.parseInt(data[3]);
+                        int losses = Integer.parseInt(data[4]);
+                        int falls = Integer.parseInt(data[5]);
+                        String breedName = data[6].trim();
+                        String horseshoeType = data[7].trim();
+                        String coatColor = data[8].trim();
+                        String saddleType = data.length >= 10 ? data[9].trim() : "Racing Style";
 
-                    // Convert breed name to correct constant
-                    String breed = HorseBreed.THOROUGHBRED; // default value
-                    if (breedName.equals("Arabian")) {
-                        breed = HorseBreed.ARABIAN;
-                    } else if (breedName.equals("Quarter Horse")) {
-                        breed = HorseBreed.QUARTER_HORSE;
-                    } else if (breedName.equals("Clydesdale")) {
-                        breed = HorseBreed.CLYDESDALE;
-                    } else if (breedName.equals("Appaloosa")) {
-                        breed = HorseBreed.APPALOOSA;
-                    } else if (breedName.equals("Thoroughbred")) {
-                        breed = HorseBreed.THOROUGHBRED;
+                        // Breed
+                        String breed = "Thoroughbred"; // default value
+                        if (breedName.equals("Arabian")) {
+                            breed = "Arabian";
+                        } else if (breedName.equals("Quarter Horse")) {
+                            breed = "Quarter Horse";
+                        } else if (breedName.equals("Clydesdale")) {
+                            breed = "Clydesdale";
+                        } else if (breedName.equals("Appaloosa")) {
+                            breed = "Appaloosa";
+                        } else if (breedName.equals("Thoroughbred")) {
+                            breed = "Thoroughbred";
+                        }
+
+                        // Colour Coat
+                        String color = "Bay"; // default value
+                        if (coatColor.equals("Black")) {
+                            color = "Black";
+                        } else if (coatColor.equals("Chestnut")) {
+                            color = "Chestnut";
+                        } else if (coatColor.equals("White")) {
+                            color = "White";
+                        } else if (coatColor.equals("Grey")) {
+                            color = "Grey";
+                        } else if (coatColor.equals("Palomino")) {
+                            color = "Palomino";
+                        } else if (coatColor.equals("Pinto")) {
+                            color = "Pinto";
+                        } else if (coatColor.equals("Bay")) {
+                            color = "Bay";
+                        }
+
+                        String horseshoes = "Grip".equals(horseshoeType) ? "Grip" : "Standard";
+                        
+                        Horse horse = new Horse(name, confidence, trackLengthInteger, 
+                                            breed, horseshoes, color, saddleType);
+                        horse.setWins(wins);
+                        horse.setLosses(losses);
+                        horse.setFalls(falls);
+                        
+                        allHorses.add(horse);
+                    } 
+                    catch (NumberFormatException e) 
+                    {
+                        System.err.println("Error parsing number in line: " + line);
                     }
-
-                    // Convert color name to correct constant
-                    String color = CoatColor.BAY; // default value
-                    if (coatColor.equals("Black")) {
-                        color = CoatColor.BLACK;
-                    } else if (coatColor.equals("Chestnut")) {
-                        color = CoatColor.CHESTNUT;
-                    } else if (coatColor.equals("White")) {
-                        color = CoatColor.WHITE;
-                    } else if (coatColor.equals("Grey")) {
-                        color = CoatColor.GREY;
-                    } else if (coatColor.equals("Palomino")) {
-                        color = CoatColor.PALOMINO;
-                    } else if (coatColor.equals("Pinto")) {
-                        color = CoatColor.PINTO;
-                    } else if (coatColor.equals("Bay")) {
-                        color = CoatColor.BAY;
-                    }
-
-                    // Converts horseshoe type
-                    String horseshoes = horseshoeType.equals("Grip") ? "Grip" : "Standard";
-                    
-                    // Creates horse with all attributes
-                    Horse horse = new Horse(name, confidence, trackLengthInteger, breed, horseshoes, color, saddleType);
-                    horse.setWins(wins);
-                    horse.setLosses(losses);
-                    horse.setFalls(falls);
-                    
-                    allHorses.add(horse);
                 }
             }
             
-            // Convert allHorses to array
-            horses = allHorses.toArray(new Horse[0]);
-            System.out.println("Horse data loaded from: " + file.getAbsolutePath());
+            // Start with first two horses from allHorses if available
+            int initialLanes = 2; // or whatever your default starting lanes is
+            horses = new Horse[initialLanes];
+            for (int i = 0; i < initialLanes && i < allHorses.size(); i++) {
+                horses[i] = allHorses.get(i);
+            }
+            
+            System.out.println("Successfully loaded " + allHorses.size() + 
+                            " horses from: " + file.getAbsolutePath());
         } 
         catch (IOException e) 
         {
-            JOptionPane.showMessageDialog(this, 
-                "Error loading horse data: " + e.getMessage() + 
-                "\nFile location: " + file.getAbsolutePath(),
-                "Error", JOptionPane.ERROR_MESSAGE);
+            String errorMsg = "Error loading horse data: " + e.getMessage() + 
+                            "\nFile location: " + file.getAbsolutePath();
+            System.err.println(errorMsg);
+            JOptionPane.showMessageDialog(this, errorMsg, "Error", JOptionPane.ERROR_MESSAGE);
+            
+            horses = new Horse[0];  // Start with empty array if there's an error
         }
     }
     
@@ -1884,53 +1968,60 @@ class RaceTrackPanel extends JPanel
         int width = getWidth();
         int height = getHeight();
         
-        g.setColor(Color.BLACK);
+        g2d.setColor(Color.BLACK);
         
         if (trackShape.equals("Oval")) 
         {
-            drawOvalTrack(g, g2d, width, height);
+            drawOvalTrack(g2d, width, height);
         }
         else if (trackShape.equals("Figure-Eight")) 
         {  
-            drawFigureEightTrack(g, g2d, width, height);
+            drawFigureEightTrack(g2d, width, height);
         } 
         else if (trackShape.equals("Straight")) 
         {
-            drawStraightTrack(g, g2d, width, height);
+            drawStraightTrack(g2d, width, height);
         } 
     }
 
-    private void drawOvalTrack(Graphics g, Graphics2D g2d, int width, int height) 
+    private void drawOvalTrack(Graphics2D g2d, int width, int height) 
     {
-        //drawing the ovals
+        g2d.setStroke(new BasicStroke(3.0f));
+
         for (int i = 0; i < laneCount; i++) 
         {
             int ovalWidth = width - 200 - (i * 80);
             int ovalHeight = height - 100 - (i * 80);
-            g.drawOval(100 + (i * 40), 50 + (i * 40), ovalWidth, ovalHeight);
+            g2d.drawOval(100 + (i * 40), 50 + (i * 40), ovalWidth, ovalHeight);
 
-            // Draw horizontal red finish line (thick and spans all lanes)
-            g.setColor(Color.RED);
-            g.fillRect(100, height/2+5, i*40, 5);
+            // Draw horizontal red finish line
+            g2d.setColor(Color.RED);
+            g2d.fillRect(100, height/2+5, i*40, 5);
 
             //Draw horizontal green start line
-            g.setColor(Color.GREEN);
-            g.fillRect(100, height/2, i*40, 5);
-            g.setColor(Color.BLACK);
+            g2d.setColor(Color.GREEN);
+            g2d.fillRect(100, height/2, i*40, 5);
+            g2d.setColor(Color.BLACK);
         }
 
-        // Draw horses using the new method
+        // Draw horses
         for (int i = 0; i < laneCount; i++) 
         {
             Horse horse = horses[i];
             int x = horse.getX(width, height, trackShape, i);
             int y = horse.getY(width, height, trackShape, i);
-            drawHorse(g, x, y, horse, 35);  // Use drawHorse instead of direct drawing
+            drawHorse(g2d, x, y, horse, 35);
+
+            g2d.setColor(Color.BLACK);
+            g2d.setFont(new Font("Arial", Font.BOLD, 14));
+            String lapText = String.format("Lap %d/%d", horse.getCurrentLap("Oval"), horse.getRequiredLaps("Oval"));
+            g2d.drawString(lapText, x + 45, y - 5);
         }
     }
 
-    private void drawFigureEightTrack(Graphics g, Graphics2D g2d, int width, int height) 
+    private void drawFigureEightTrack(Graphics2D g2d, int width, int height) 
     {
+        g2d.setStroke(new BasicStroke(3.0f));
         //drawing the track
         for (int i = 0; i < laneCount; i++) 
         {
@@ -1949,50 +2040,55 @@ class RaceTrackPanel extends JPanel
             g2d.drawPolyline(xPoints, yPoints, resolution);
 
             // Drawing horizontal red finish line
-            g.setColor(Color.RED);
-            g.fillOval(width/2-7, height/2-6, 12, 12);
-            g.setColor(Color.BLACK);
+            g2d.setColor(Color.RED);
+            g2d.fillOval(width/2-7, height/2-6, 12, 12);
+            g2d.setColor(Color.BLACK);
         }
 
-        // Draw horses using the new method
+        // Draw horses 
         for (int i = 0; i < laneCount; i++) 
         {
             Horse horse = horses[i];
             int x = horse.getX(width, height, trackShape, i);
             int y = horse.getY(width, height, trackShape, i);
-            drawHorse(g, x, y, horse, 35);  // Use drawHorse instead of direct drawing
+            drawHorse(g2d, x, y, horse, 35);
+
+            g2d.setColor(Color.BLACK);
+            g2d.setFont(new Font("Arial", Font.BOLD, 14));
+            String lapText = String.format("Lap %d/%d", horse.getCurrentLap("Figure-Eight"), horse.getRequiredLaps("Figure-Eight"));
+            g2d.drawString(lapText, x + 45, y - 5);
         }
     }
 
-    private void drawStraightTrack(Graphics g, Graphics2D g2d, int width, int height) 
+    private void drawStraightTrack(Graphics2D g2d, int width, int height) 
     {
+        g2d.setStroke(new BasicStroke(3.0f));
         // Draw straight lanes
         for (int i = 0; i < laneCount; i++) 
         {
-            g.drawLine(50, 100+(i*40), width - 50, 100+(i*40));
+            g2d.drawLine(50, 100+(i*40), width - 50, 100+(i*40));
 
-            // Draw horizontal red finish line (thick and spans all lanes)
-            g.setColor(Color.RED);
-            g.fillRect(width - 50, 100, 5, i*40);
+            // Draw horizontal red finish line
+            g2d.setColor(Color.RED);
+            g2d.fillRect(width - 50, 100, 5, i*40);
 
             // Draw horizontal green start line
-            g.setColor(Color.GREEN);
-            g.fillRect(50, 100, 5, i*40);
-            g.setColor(Color.BLACK);
+            g2d.setColor(Color.GREEN);
+            g2d.fillRect(50, 100, 5, i*40);
+            g2d.setColor(Color.BLACK);
         }
 
-        // Draw horses using the new method
+        // Draw horses
         for (int i = 0; i < laneCount; i++) 
         {
             Horse horse = horses[i];
             int x = horse.getX(width, height, trackShape, i);
             int y = horse.getY(width, height, trackShape, i);
-            drawHorse(g, x, y, horse, 35);  // Use drawHorse instead of direct drawing
+            drawHorse(g2d, x, y, horse, 35);
         }
     }
-    private void drawHorse(Graphics g, int x, int y, Horse horse, int size) 
+    private void drawHorse(Graphics2D g2d, int x, int y, Horse horse, int size) 
     {
-        Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         // If horse has fallen, draw an X
@@ -2125,7 +2221,7 @@ class RaceTrackPanel extends JPanel
 
         // Horse name above the horse
         g2d.setColor(Color.BLACK);
-        g2d.setFont(new Font("Arial", Font.BOLD, size/4));
+        g2d.setFont(new Font("Arial", Font.BOLD, size/3));
         FontMetrics metrics = g2d.getFontMetrics();
         int nameWidth = metrics.stringWidth(horse.getName());
         g2d.drawString(horse.getName(), x - nameWidth/2, y - size/2);
@@ -2388,11 +2484,11 @@ class Horse
         boolean inDecelZone = false;
         double baseSpeed = 1.0;  // Constant base speed instead of scaling with track length
 
-        if (trackShape.equals("Oval") && (progress >= 0.4 && progress <= 0.5)) 
+        if (trackShape.equals("Oval") && (progress >= 0.4 && progress <= 0.5 || progress >= 0.9 && progress <= 1.0)) 
         {
             inDecelZone = true;
         } 
-        else if (trackShape.equals("Figure-Eight") && (progress >= 0.45 && progress < 0.5 || progress >= 0.95 && progress < 1.0)) 
+        else if (trackShape.equals("Figure-Eight") && (progress >= 0.4 && progress < 0.5 || progress >= 0.9 && progress < 1.0)) 
         {
             inDecelZone = true;
         }
@@ -2411,7 +2507,7 @@ class Horse
         this.distanceTravelled += currentSpeed;
 
         // Apply weather effects to falling chance
-        double weatherAdjustedFallRisk = 0.0001 * Math.exp(this.horseConfidence) * fallRiskModifier;
+        double weatherAdjustedFallRisk = 0.001 * Math.pow(this.horseConfidence, 2) * fallRiskModifier;
         if (Math.random() < weatherAdjustedFallRisk) 
         {
             this.hasFallen = true;
@@ -2530,12 +2626,12 @@ class HorseBreed
     {
         if (breedName.equals(THOROUGHBRED))
         {
-            this.speedModifier = 1.2;
+            this.speedModifier = 1.1;
             this.breedSymbol = 'T';
         }
         else if (breedName.equals(ARABIAN))
         {
-            this.speedModifier = 1.1;
+            this.speedModifier = 1.05;
             this.breedSymbol = 'A';
         }
         else if (breedName.equals(QUARTER_HORSE))
