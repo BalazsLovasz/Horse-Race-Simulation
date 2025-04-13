@@ -19,6 +19,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 
 
@@ -61,7 +63,7 @@ class StartRaceGUI extends JFrame
     private JTextField[] horseConfidences = new JTextField[5];
 
     // Buttons
-    private JButton readyButton, restartButton, exitButton, viewMetricsButton, placeBetsButton, startRaceButton, viewBetsHistoryButton;
+    private JButton readyButton, restartButton, exitButton, viewMetricsButton, placeBetsButton, startRaceButton;
     private RaceTrackPanel currentRacePanel;
 
     public StartRaceGUI()
@@ -205,11 +207,6 @@ class StartRaceGUI extends JFrame
         placeBetsButton.addActionListener(new PlaceBetsButtonListener());
         placeBetsButton.setVisible(false);
 
-        // View Bets History Button
-        viewBetsHistoryButton = createButton("Bets History", new Color(150, 150, 200), 14, 120);
-        viewBetsHistoryButton.addActionListener(new ViewBetsHistoryButtonListener());
-        viewBetsHistoryButton.setVisible(true);  
-
         // Button Panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
 
@@ -221,7 +218,6 @@ class StartRaceGUI extends JFrame
         buttonPanel.add(restartButton);
         buttonPanel.add(placeBetsButton);
         buttonPanel.add(startRaceButton);
-        buttonPanel.add(viewBetsHistoryButton);
         mainPanel.add(buttonPanel, BorderLayout.NORTH);
     }
 
@@ -1359,37 +1355,36 @@ class StartRaceGUI extends JFrame
             // Load bet history first
             loadBetHistory();
             
-            // Create and show the betting panel
-            BettingPanel bettingPanel = new BettingPanel(horses, weatherConditionString, trackShapeString, currentBets, betHistory, StartRaceGUI.this);
-            
-            JFrame bettingFrame = new JFrame("Place Your Bets");
+            // Create and show the betting panel in a new frame
+            JFrame bettingFrame = new JFrame("Horse Race Betting");
             bettingFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            
+            // Create the tabbed betting panel
+            BettingPanel bettingPanel = new BettingPanel(
+                horses,                  // Current race horses
+                weatherConditionString,  // Current weather
+                trackShapeString,        // Current track shape
+                currentBets,            // Current race bets
+                betHistory,             // Historical bets
+                StartRaceGUI.this       // mainGUI reference
+            );
+            
+            // Add the panel to the frame
             bettingFrame.add(bettingPanel);
-            bettingFrame.pack();
-            bettingFrame.setLocationRelativeTo(null);
+            
+            // Set frame properties
+            bettingFrame.setSize(800, 600);  // Larger size to accommodate tabs
+            bettingFrame.setLocationRelativeTo(null);  // Center on screen
+            bettingFrame.setResizable(true);
+            
+            // Make the frame visible
             bettingFrame.setVisible(true);
         }
     }
 
-    private class ViewBetsHistoryButtonListener implements ActionListener 
-    {
-        @Override
-        public void actionPerformed(ActionEvent e) 
-        {
-            JFrame historyFrame = new JFrame("Betting History");
-            BettingHistoryPanel historyPanel = new BettingHistoryPanel(betHistory);
-            historyFrame.add(historyPanel);
-            historyFrame.pack();
-            historyFrame.setLocationRelativeTo(null);
-            historyFrame.setVisible(true);
-        }
-    }
 
     public void handleRaceCompletion(Horse winner) 
     {
-        System.out.println("Processing bets for winner: " + winner.getName());
-        System.out.println("Current bets count: " + currentBets.size());
-        
         // Update bet results based on winner
         for (Bet bet : currentBets) 
         {
@@ -1397,26 +1392,16 @@ class StartRaceGUI extends JFrame
             bet.setWon(won);
             if (won) 
             {
-                // Calculate total winnings (bet amount * odds)
-                double totalWinnings = bet.getAmount() * bet.getOdds();
-                // First return the original bet amount
-                updateUserBalance(bet.getAmount());
-                // Then add the winnings
-                updateUserBalance(totalWinnings);
+                // Just add the winnings (payout) without returning the original bet
+                double winnings = bet.getAmount() * bet.getOdds();
+                updateUserBalance(winnings);
                 System.out.println("Bet won! Original bet: " + bet.getAmount() + 
-                                 ", Total winnings: " + totalWinnings);
+                                 ", Winnings added: " + winnings + 
+                                 ", New balance: " + getUserBalance());
             }
         }
-        
-        // Add current bets to history
         betHistory.addAll(currentBets);
-        
-        // Save to file
         saveBetsToFile();
-        
-        System.out.println("Total bets in history: " + betHistory.size());
-        
-        // Clear current bets for next race
         currentBets.clear();
     }
 
@@ -2555,7 +2540,7 @@ class Horse
         StringBuilder symbol = new StringBuilder();
         symbol.append(breed.getBreedSymbol());
         symbol.append('-');
-        symbol.append(horseshoeType.equals("Grip") ? 'G' : 'S');
+        symbol.append(horseshoeType.equals("Grip") ? 'G' : horseshoeType.equals("Spiked") ? 'P' : 'S');
         this.horseSymbol = symbol.toString();
     }
 
@@ -3052,20 +3037,21 @@ class CoatColor
 
 class BettingPanel extends JPanel 
 {
+    // Instance variables
     private StartRaceGUI parent;
     private JTextField betAmountField;
     private JComboBox<String> horseSelector;
     private JLabel balanceLabel;
     private JLabel oddsLabel;
     private JLabel potentialWinningsLabel;
-    private double userBalance = 1000.0; // Starting balance
     private Horse[] horses;
     private String weatherCondition;
     private String trackShape;
+    private JTabbedPane tabbedPane;
 
     public BettingPanel(Horse[] horses, String weatherCondition, String trackShape, 
-                   ArrayList<Bet> currentBets, ArrayList<Bet> betHistory,
-                   StartRaceGUI parent)
+                       ArrayList<Bet> currentBets, ArrayList<Bet> betHistory,
+                       StartRaceGUI parent)
     {
         this.parent = parent;
         this.horses = horses;
@@ -3074,15 +3060,32 @@ class BettingPanel extends JPanel
         
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Create tabbed pane
+        tabbedPane = new JTabbedPane();
         
-        // Top panel for balance and current bet info
-        JPanel topPanel = new JPanel(new GridLayout(2, 1));
-        balanceLabel = new JLabel(); // Initialize the label first
+        // Add tabs
+        tabbedPane.addTab("Place Bets", createPlaceBetsTab());
+        tabbedPane.addTab("Race Statistics", createCurrentRaceStatsTab());
+        tabbedPane.addTab("Betting History", createBettingHistoryTab());
+        tabbedPane.addTab("Betting Analysis", createBettingAnalysisTab());
+
+        add(tabbedPane, BorderLayout.CENTER);
+    }
+
+    private JPanel createPlaceBetsTab() 
+    {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Top panel for balance
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        balanceLabel = new JLabel("Current Balance: £" + String.format("%.2f", parent.getUserBalance()));
+        balanceLabel.setFont(new Font("Arial", Font.BOLD, 14));
         topPanel.add(balanceLabel);
-        balanceLabel.setText("Current Balance: £" + parent.getUserBalance()); // Now set the text
-        
-        // Center panel for horse selection and bet amount
-        JPanel centerPanel = new JPanel(new GridLayout(2, 2, 5, 5));
+
+        // Center panel for betting inputs
+        JPanel centerPanel = new JPanel(new GridLayout(4, 2, 5, 5));
         
         // Horse selection
         centerPanel.add(new JLabel("Select Horse:"));
@@ -3097,44 +3100,165 @@ class BettingPanel extends JPanel
         betAmountField = new JTextField();
         centerPanel.add(betAmountField);
         
-        // Odds and potential winnings
+        // Odds display
         centerPanel.add(new JLabel("Current Odds:"));
         oddsLabel = new JLabel("Calculating...");
         centerPanel.add(oddsLabel);
         
+        // Potential winnings
         centerPanel.add(new JLabel("Potential Winnings:"));
         potentialWinningsLabel = new JLabel("£0.00");
         centerPanel.add(potentialWinningsLabel);
-        
+
         // Bottom panel for buttons
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         JButton placeBetButton = new JButton("Place Bet");
-        JButton cancelButton = new JButton("Cancel");
-        
-        bottomPanel.add(placeBetButton);
-        bottomPanel.add(cancelButton);
-        
-        // Adding all panels to main panel
-        add(topPanel, BorderLayout.NORTH);
-        add(centerPanel, BorderLayout.CENTER);
-        add(bottomPanel, BorderLayout.SOUTH);
-        
-        // Adding listeners
-        horseSelector.addActionListener(e -> updateOddsAndWinnings());
-        betAmountField.addActionListener(e -> updateOddsAndWinnings());
-        
         placeBetButton.addActionListener(e -> placeBet());
-        cancelButton.addActionListener(e -> {
-            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-            frame.dispose();
-        });
+        bottomPanel.add(placeBetButton);
 
-        parent.loadBetHistory();
+        panel.add(topPanel, BorderLayout.NORTH);
+        panel.add(centerPanel, BorderLayout.CENTER);
+        panel.add(bottomPanel, BorderLayout.SOUTH);
+
+        // Add listeners
+        horseSelector.addActionListener(e -> updateOddsAndWinnings());
+        betAmountField.getDocument().addDocumentListener(new DocumentListener() {
+        public void changedUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
+        public void removeUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
+        public void insertUpdate(DocumentEvent e) { updateOddsAndWinnings(); }
+        });
         
-        // Initialising update
         updateOddsAndWinnings();
+        return panel;
     }
-    
+
+    private JPanel createCurrentRaceStatsTab() 
+    {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        // Create table for current race statistics
+        String[] columns = {"Horse", "Total Bets", "Total Amount", "Current Odds"};
+        DefaultTableModel model = new DefaultTableModel(columns, 0);
+        JTable statsTable = new JTable(model);
+        
+        // Populate table
+        for (Horse horse : horses) {
+            double odds = calculateOdds(horse);
+            int totalBets = countBetsOnHorse(horse.getName());
+            double totalAmount = calculateTotalBetsAmount(horse.getName());
+            
+            model.addRow(new Object[]{
+                horse.getName(),
+                totalBets,
+                String.format("£%.2f", totalAmount),
+                String.format("%.2f:1", odds)
+            });
+        }
+
+        JScrollPane scrollPane = new JScrollPane(statsTable);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Add refresh button
+        JButton refreshButton = new JButton("Refresh Statistics");
+        refreshButton.addActionListener(e -> updateRaceStats(statsTable));
+        panel.add(refreshButton, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private JPanel createBettingHistoryTab() 
+    {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        // Create betting history table
+        String[] columns = {"Date", "Horse", "Amount", "Odds", "Result", "Payout"};
+        DefaultTableModel model = new DefaultTableModel(columns, 0);
+        JTable historyTable = new JTable(model);
+        
+        // Populate with betting history
+        for (Bet bet : parent.betHistory) {
+            model.addRow(new Object[]{
+                bet.getTimestamp(),
+                bet.getHorseName(),
+                String.format("£%.2f", bet.getAmount()),
+                String.format("%.2f:1", bet.getOdds()),
+                bet.isWon() ? "Won" : "Lost",
+                String.format("£%.2f", bet.calculatePayout())
+            });
+        }
+
+        panel.add(new JScrollPane(historyTable), BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JPanel createBettingAnalysisTab() 
+    {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        // Create statistics panel
+        JPanel statsPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+        
+        // Calculate statistics
+        int totalBets = parent.betHistory.size();
+        long wonBets = parent.betHistory.stream().filter(Bet::isWon).count();
+        double winRate = totalBets > 0 ? (double) wonBets / totalBets * 100 : 0;
+        double totalWinnings = parent.betHistory.stream()
+            .mapToDouble(bet -> bet.isWon() ? bet.calculatePayout() - bet.getAmount() : -bet.getAmount())
+            .sum();
+        
+        // Add statistics
+        statsPanel.add(new JLabel("Total Bets Placed:"));
+        statsPanel.add(new JLabel(String.valueOf(totalBets)));
+        statsPanel.add(new JLabel("Bets Won:"));
+        statsPanel.add(new JLabel(String.valueOf(wonBets)));
+        statsPanel.add(new JLabel("Win Rate:"));
+        statsPanel.add(new JLabel(String.format("%.1f%%", winRate)));
+        statsPanel.add(new JLabel("Total Profit/Loss:"));
+        statsPanel.add(new JLabel(String.format("£%.2f", totalWinnings)));
+
+        // Add betting pattern analysis
+        JTextArea analysisArea = new JTextArea();
+        analysisArea.setEditable(false);
+        analysisArea.setWrapStyleWord(true);
+        analysisArea.setLineWrap(true);
+        analysisArea.setMargin(new Insets(10, 10, 10, 10));
+        
+        // Generate analysis text
+        StringBuilder analysis = new StringBuilder();
+        analysis.append("Betting Pattern Analysis:\n\n");
+        if (totalBets > 0) {
+            if (winRate > 50) {
+                analysis.append("You're doing well! Your win rate is above 50%.\n");
+            } else {
+                analysis.append("Consider adjusting your betting strategy to improve your win rate.\n");
+            }
+            
+            // Add more specific advice based on betting patterns
+            double avgBetAmount = parent.betHistory.stream()
+                .mapToDouble(Bet::getAmount)
+                .average()
+                .orElse(0);
+            
+            analysis.append(String.format("\nAverage bet amount: £%.2f\n", avgBetAmount));
+            
+            if (totalWinnings < 0) {
+                analysis.append("You're currently at a loss. Consider:\n");
+                analysis.append("- Setting a betting budget\n");
+                analysis.append("- Making smaller bets to extend your playing time\n");
+                analysis.append("- Studying horse performance patterns more carefully\n");
+            }
+        } else {
+            analysis.append("Place some bets to see betting pattern analysis.");
+        }
+        
+        analysisArea.setText(analysis.toString());
+
+        panel.add(statsPanel, BorderLayout.NORTH);
+        panel.add(new JScrollPane(analysisArea), BorderLayout.CENTER);
+        
+        return panel;
+    }
+
     private void updateOddsAndWinnings() 
     {
         String selectedHorseName = (String) horseSelector.getSelectedItem();
@@ -3151,25 +3275,126 @@ class BettingPanel extends JPanel
         if (selectedHorse != null) 
         {
             double odds = calculateOdds(selectedHorse);
-            oddsLabel.setText(String.format("%.2f", odds) + " to 1");
+            oddsLabel.setText(String.format("%.2f to 1", odds));
             
-            try 
+            // Only calculate potential winnings if there's a valid bet amount
+            String betText = betAmountField.getText().trim();
+            if (!betText.isEmpty()) 
             {
-                double betAmount = Double.parseDouble(betAmountField.getText());
-                double potentialWinnings = betAmount * odds;
-                potentialWinningsLabel.setText(String.format("£%.2f", potentialWinnings));
+                try 
+                {
+                    double betAmount = Double.parseDouble(betText);
+                    double potentialWinnings = betAmount * odds;
+                    potentialWinningsLabel.setText(String.format("£%.2f", potentialWinnings));
+                } 
+                catch (NumberFormatException e) 
+                {
+                    potentialWinningsLabel.setText("£0.00");
+                }
             } 
-            catch (NumberFormatException e) 
+            else 
             {
                 potentialWinningsLabel.setText("£0.00");
             }
         }
     }
-    
-    
-    private double calculateOdds(Horse horse) 
+
+    private void placeBet() 
     {
-        // Base odds is calculated based on horse's confidence
+        try {
+            double betAmount = Double.parseDouble(betAmountField.getText());
+            if (betAmount <= 0) {
+                JOptionPane.showMessageDialog(this, "Please enter a valid bet amount.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            if (betAmount > parent.getUserBalance()) {
+                JOptionPane.showMessageDialog(this, "Insufficient balance.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            String selectedHorse = (String)horseSelector.getSelectedItem();
+            Horse horse = null;
+            for (Horse h : horses) {
+                if (h.getName().equals(selectedHorse)) {
+                    horse = h;
+                    break;
+                }
+            }
+            
+            if (horse != null) {
+                double currentOdds = calculateOdds(horse);
+                Bet newBet = new Bet(selectedHorse, betAmount, currentOdds);
+                
+                // Update balance
+                parent.updateUserBalance(-betAmount);
+                balanceLabel.setText("Current Balance: £" + String.format("%.2f", parent.getUserBalance()));
+                
+                // Store bet
+                parent.currentBets.add(newBet);
+                
+                // Find and update the stats table in the second tab
+                Component statsTab = tabbedPane.getComponentAt(1);
+                if (statsTab instanceof JPanel) {
+                    JPanel statsPanel = (JPanel) statsTab;
+                    Component[] components = statsPanel.getComponents();
+                    for (Component comp : components) {
+                        if (comp instanceof JScrollPane) {
+                            JScrollPane scrollPane = (JScrollPane) comp;
+                            JViewport viewport = scrollPane.getViewport();
+                            if (viewport.getView() instanceof JTable) {
+                                JTable statsTable = (JTable) viewport.getView();
+                                updateRaceStats(statsTable);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                JOptionPane.showMessageDialog(this, "Bet placed successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                
+                // Clear input
+                betAmountField.setText("");
+                updateOddsAndWinnings();
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid bet amount.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void updateRaceStats(JTable statsTable) {
+        DefaultTableModel model = (DefaultTableModel) statsTable.getModel();
+        model.setRowCount(0);
+        
+        for (Horse horse : horses) {
+            double odds = calculateOdds(horse);
+            int totalBets = countBetsOnHorse(horse.getName());
+            double totalAmount = calculateTotalBetsAmount(horse.getName());
+            
+            model.addRow(new Object[]{
+                horse.getName(),
+                totalBets,
+                String.format("£%.2f", totalAmount),
+                String.format("%.2f:1", odds)
+            });
+        }
+    }
+
+    private int countBetsOnHorse(String horseName) {
+        return (int) parent.currentBets.stream()
+            .filter(bet -> bet.getHorseName().equals(horseName))
+            .count();
+    }
+
+    private double calculateTotalBetsAmount(String horseName) {
+        return parent.currentBets.stream()
+            .filter(bet -> bet.getHorseName().equals(horseName))
+            .mapToDouble(Bet::getAmount)
+            .sum();
+    }
+
+    private double calculateOdds(Horse horse) {
+        // Your existing odds calculation code
         double baseOdds = 1.0 / horse.getConfidence();
         
         // Weather conditions adjustments
@@ -3200,22 +3425,15 @@ class BettingPanel extends JPanel
         }
         
         // Track shape adjustments
-        if (trackShape.equals("Figure-Eight")) 
-        {
-            if (horse.getBreed().getBreedName().equals("Clydesdale")) 
-            {
-                baseOdds *= 1.1; 
-            } 
-            else if (horse.getBreed().getBreedName().equals("Thoroughbred")) 
-            {
-                baseOdds *= 0.8; 
+        if (trackShape.equals("Figure-Eight")) {
+            if (horse.getBreed().getBreedName().equals("Clydesdale")) {
+                baseOdds *= 1.1;
+            } else if (horse.getBreed().getBreedName().equals("Thoroughbred")) {
+                baseOdds *= 0.8;
             }
-        } 
-        else if (trackShape.equals("Straight")) 
-        {
-            if (horse.getBreed().getBreedName().equals("Thoroughbred")) 
-            {
-                baseOdds *= 0.9; 
+        } else if (trackShape.equals("Straight")) {
+            if (horse.getBreed().getBreedName().equals("Thoroughbred")) {
+                baseOdds *= 0.9;
             }
         }
         
@@ -3224,60 +3442,6 @@ class BettingPanel extends JPanel
         baseOdds *= (1.0 / (winRate + 0.1)); // Adding 0.1 to prevent division by zero
         
         return Math.round(baseOdds * 100.0) / 100.0; // Round to 2 decimal places
-    }
-    
-    private void placeBet() 
-    {
-        try 
-        {
-            double betAmount = Double.parseDouble(betAmountField.getText());
-            if (betAmount <= 0) 
-            {
-                JOptionPane.showMessageDialog(this, "Please enter a valid bet amount.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            
-            if (betAmount > parent.getUserBalance()) 
-            {
-                JOptionPane.showMessageDialog(this, "Insufficient balance.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            
-            // Create new bet
-            String selectedHorse = (String)horseSelector.getSelectedItem();
-            Horse horse = null;
-            for (Horse h : horses) 
-            {
-                if (h.getName().equals(selectedHorse)) 
-                {
-                    horse = h;
-                    break;
-                }
-            }
-            
-            if (horse != null) 
-            {
-                double currentOdds = calculateOdds(horse);
-                Bet newBet = new Bet(selectedHorse, betAmount, currentOdds);
-                
-                // Updating balance
-                parent.updateUserBalance(-betAmount); // Subtract bet amount
-                balanceLabel.setText("Current Balance: £" + parent.getUserBalance());
-                
-                // Storing bet
-                parent.currentBets.add(newBet);
-                
-                JOptionPane.showMessageDialog(this, "Bet placed successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
-                
-                // Close the betting window
-                JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-                frame.dispose();
-            }
-        } 
-        catch (NumberFormatException e) 
-        {
-            JOptionPane.showMessageDialog(this, "Please enter a valid bet amount.", "Error", JOptionPane.ERROR_MESSAGE);
-        }
     }
 }
 
