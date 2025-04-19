@@ -18,8 +18,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -1407,20 +1409,50 @@ class StartRaceGUI extends JFrame
         currentBets.clear();
     }
 
+    private void cleanupDuplicateHorses() {
+        // Create a map to store unique horses by name
+        Map<String, Horse> uniqueHorses = new HashMap<>();
+        
+        // Read all horses and keep only the latest entry for each name
+        for (Horse horse : allHorses) {
+            uniqueHorses.put(horse.getName(), horse);
+        }
+        
+        // Clear and update allHorses with unique entries
+        allHorses.clear();
+        allHorses.addAll(uniqueHorses.values());
+        
+        // Save the cleaned up list back to CSV
+        saveHorsesToCSV();
+        
+        System.out.println("Cleaned up horse data. Total unique horses: " + allHorses.size());
+    }
+    
     public void saveHorsesToCSV() 
     {
         try 
         {
+            // First ensure we only have unique horses
+            Set<String> savedNames = new HashSet<>();
+            List<Horse> uniqueHorses = new ArrayList<>();
+            
+            for (Horse horse : allHorses) {
+                if (!savedNames.contains(horse.getName())) {
+                    savedNames.add(horse.getName());
+                    uniqueHorses.add(horse);
+                }
+            }
+            
             File dataDir = new File(DATA_DIR);
             if (!dataDir.exists() && !dataDir.mkdirs()) 
             {
                 throw new IOException("Could not create data directory");
             }
-
+    
             try (PrintWriter writer = new PrintWriter(new FileWriter(CSV_FILE))) 
             {
                 writer.println("Name,Symbol,Confidence,Wins,Losses,Falls,Breed,HorseshoeType,CoatColor,SaddleType");
-                for (Horse horse : allHorses) 
+                for (Horse horse : uniqueHorses) 
                 {
                     writer.println(String.format("%s,%s,%.2f,%d,%d,%d,%s,%s,%s,%s",
                         horse.getName(),
@@ -1433,7 +1465,6 @@ class StartRaceGUI extends JFrame
                         horse.getHorseshoeType(),
                         horse.getCoatColor().getColorName(),
                         horse.getSaddleType()));
-
                 }
                 System.out.println("Horse data saved to: " + new File(CSV_FILE).getAbsolutePath());
             }
@@ -1446,25 +1477,24 @@ class StartRaceGUI extends JFrame
                 "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-
+    
     private void loadHorsesFromCSV() 
     {
         if (trackLengthInteger <= 0) 
         {
             return;
         }
-
+    
         allHorses = new ArrayList<>(); // Initialising the list
         File file = new File(CSV_FILE);
         
-        // If file doesn't exist, start with empty array
         if (!file.exists()) 
         {
             System.out.println("No existing horse data file found at: " + file.getAbsolutePath());
             horses = new Horse[0];
             return;
         }
-
+    
         try (BufferedReader reader = new BufferedReader(new FileReader(CSV_FILE))) 
         {
             String line;
@@ -1477,57 +1507,68 @@ class StartRaceGUI extends JFrame
                 {
                     try {
                         String name = data[0].trim();
-                        double confidence = Double.parseDouble(data[2]);
-                        int wins = Integer.parseInt(data[3]);
-                        int losses = Integer.parseInt(data[4]);
-                        int falls = Integer.parseInt(data[5]);
-                        String breedName = data[6].trim();
-                        String horseshoeType = data[7].trim();
-                        String coatColor = data[8].trim();
-                        String saddleType = data.length >= 10 ? data[9].trim() : "Racing Style";
-
-                        // Breed
-                        String breed = "Thoroughbred"; // default value
-                        if (breedName.equals("Arabian")) {
-                            breed = "Arabian";
-                        } else if (breedName.equals("Quarter Horse")) {
-                            breed = "Quarter Horse";
-                        } else if (breedName.equals("Clydesdale")) {
-                            breed = "Clydesdale";
-                        } else if (breedName.equals("Appaloosa")) {
-                            breed = "Appaloosa";
-                        } else if (breedName.equals("Thoroughbred")) {
-                            breed = "Thoroughbred";
-                        }
-
-                        // Colour Coat
-                        String color = "Bay"; // default value
-                        if (coatColor.equals("Black")) {
-                            color = "Black";
-                        } else if (coatColor.equals("Chestnut")) {
-                            color = "Chestnut";
-                        } else if (coatColor.equals("White")) {
-                            color = "White";
-                        } else if (coatColor.equals("Grey")) {
-                            color = "Grey";
-                        } else if (coatColor.equals("Palomino")) {
-                            color = "Palomino";
-                        } else if (coatColor.equals("Pinto")) {
-                            color = "Pinto";
-                        } else if (coatColor.equals("Bay")) {
-                            color = "Bay";
-                        }
-
-                        String horseshoes = horseshoeType.equals("Grip") ? "Grip" : 
-                                          horseshoeType.equals("Spiked") ? "Spiked" : "Standard";
                         
-                        Horse horse = new Horse(name, confidence, trackLengthInteger, 
-                                            breed, horseshoes, color, saddleType);
-                        horse.setWins(wins);
-                        horse.setLosses(losses);
-                        horse.setFalls(falls);
+                        // Check if a horse with this name already exists in allHorses
+                        boolean isDuplicate = false;
+                        for (Horse existingHorse : allHorses) {
+                            if (existingHorse.getName().equals(name)) {
+                                isDuplicate = true;
+                                System.out.println("Skipping duplicate horse: " + name);
+                                break;
+                            }
+                        }
                         
-                        allHorses.add(horse);
+                        if (!isDuplicate) {
+                            double confidence = Double.parseDouble(data[2]);
+                            int wins = Integer.parseInt(data[3]);
+                            int losses = Integer.parseInt(data[4]);
+                            int falls = Integer.parseInt(data[5]);
+                            String breedName = data[6].trim();
+                            String horseshoeType = data[7].trim();
+                            String coatColor = data[8].trim();
+                            String saddleType = data.length >= 10 ? data[9].trim() : "Racing Style";
+    
+                            String breed = "Thoroughbred"; // default value
+                            if (breedName.equals("Arabian")) {
+                                breed = "Arabian";
+                            } else if (breedName.equals("Quarter Horse")) {
+                                breed = "Quarter Horse";
+                            } else if (breedName.equals("Clydesdale")) {
+                                breed = "Clydesdale";
+                            } else if (breedName.equals("Appaloosa")) {
+                                breed = "Appaloosa";
+                            } else if (breedName.equals("Thoroughbred")) {
+                                breed = "Thoroughbred";
+                            }
+    
+                            String color = "Bay"; // default value
+                            if (coatColor.equals("Black")) {
+                                color = "Black";
+                            } else if (coatColor.equals("Chestnut")) {
+                                color = "Chestnut";
+                            } else if (coatColor.equals("White")) {
+                                color = "White";
+                            } else if (coatColor.equals("Grey")) {
+                                color = "Grey";
+                            } else if (coatColor.equals("Palomino")) {
+                                color = "Palomino";
+                            } else if (coatColor.equals("Pinto")) {
+                                color = "Pinto";
+                            } else if (coatColor.equals("Bay")) {
+                                color = "Bay";
+                            }
+    
+                            String horseshoes = horseshoeType.equals("Grip") ? "Grip" : 
+                                              horseshoeType.equals("Spiked") ? "Spiked" : "Standard";
+                            
+                            Horse horse = new Horse(name, confidence, trackLengthInteger, 
+                                                breed, horseshoes, color, saddleType);
+                            horse.setWins(wins);
+                            horse.setLosses(losses);
+                            horse.setFalls(falls);
+                            
+                            allHorses.add(horse);
+                        }
                     } 
                     catch (NumberFormatException e) 
                     {
@@ -1536,8 +1577,11 @@ class StartRaceGUI extends JFrame
                 }
             }
             
+            // Clean up any duplicates after loading
+            cleanupDuplicateHorses();
+            
             // Start with first two horses from allHorses if available
-            int initialLanes = 2; // or whatever your default starting lanes is
+            int initialLanes = 2;
             horses = new Horse[initialLanes];
             for (int i = 0; i < initialLanes && i < allHorses.size(); i++) {
                 horses[i] = allHorses.get(i);
@@ -1553,7 +1597,7 @@ class StartRaceGUI extends JFrame
             System.err.println(errorMsg);
             JOptionPane.showMessageDialog(this, errorMsg, "Error", JOptionPane.ERROR_MESSAGE);
             
-            horses = new Horse[0];  // Start with empty array if there's an error
+            horses = new Horse[0];
         }
     }
     
@@ -3050,6 +3094,7 @@ class BettingPanel extends JPanel
     private String weatherCondition;
     private String trackShape;
     private JTabbedPane tabbedPane;
+    private JTable statsTable;
 
     public BettingPanel(Horse[] horses, String weatherCondition, String trackShape, 
                        ArrayList<Bet> currentBets, ArrayList<Bet> betHistory,
@@ -3302,7 +3347,7 @@ class BettingPanel extends JPanel
         // Create table for current race statistics
         String[] columns = {"Horse", "Total Bets", "Total Amount", "Current Odds"};
         DefaultTableModel model = new DefaultTableModel(columns, 0);
-        JTable statsTable = new JTable(model);
+        statsTable = new JTable(model); 
         
         // Populate table
         for (Horse horse : horses) 
@@ -3318,15 +3363,15 @@ class BettingPanel extends JPanel
                 String.format("%.2f:1", odds)
             });
         }
-
+    
         JScrollPane scrollPane = new JScrollPane(statsTable);
         panel.add(scrollPane, BorderLayout.CENTER);
         
         // Add refresh button
         JButton refreshButton = new JButton("Refresh Statistics");
-        refreshButton.addActionListener(e -> updateRaceStats(statsTable));
+        refreshButton.addActionListener(e -> updateRaceStats(statsTable)); 
         panel.add(refreshButton, BorderLayout.SOUTH);
-
+    
         return panel;
     }
 
@@ -3643,9 +3688,9 @@ class BettingPanel extends JPanel
             if (horse.getHorseshoeType().equals("Standard")) {
                 baseOdds *= 1.5; // Worse performance
             } else if (horse.getHorseshoeType().equals("Grip")) {
-                baseOdds *= 0.9; // Slightly better than standard
+                baseOdds *= 0.8; // Slightly better than standard
             } else if (horse.getHorseshoeType().equals("Spiked")) {
-                baseOdds *= 0.7; // Best performance on ice
+                baseOdds *= 0.6; // Best performance on ice
             }
         } else if (weatherCondition.equals("Muddy")) {
             if (horse.getHorseshoeType().equals("Standard")) {
