@@ -278,7 +278,7 @@ class Race
         //else print the horse's symbol
         if(theHorse.hasFallen())
         {
-            System.out.print('X');
+            System.out.println("\u001B[31mX\u001B[0m");
         }
         else
         {
