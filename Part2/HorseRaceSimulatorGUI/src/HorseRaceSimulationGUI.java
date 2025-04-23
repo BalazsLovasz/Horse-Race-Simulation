@@ -2755,6 +2755,7 @@ class Horse
 
     public double getCurrentSpeed()
     {
+        
         return this.currentSpeed;
     }
 
