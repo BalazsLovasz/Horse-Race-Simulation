@@ -5,6 +5,7 @@
  * @version 1
  */
 
+
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -282,6 +283,7 @@ class RaceTrackPanel extends JPanel
 class Horse
 {
     //instance variable set to private to improve security
+
     private String horseName;
     private char horseSymbol;
     private int horseDistance;
@@ -289,6 +291,7 @@ class Horse
     private double horseConfidence;
 
     public Horse(char horseSymbol, String horseName, double horseConfidence) //constructor
+
     {
         this.horseName = horseName;
         this.horseSymbol = horseSymbol;
@@ -298,47 +301,58 @@ class Horse
     }
 
     public void fall() //method that sets horse to fallen
+
     {
         this.hasFallen = true;
     }
 
     public double getConfidence() //returns the confidence of the horse
+
     {
         return this.horseConfidence;
     }
 
     public int getDistanceTravelled() //returns the distance travelled by the horse
+
     {
         return this.horseDistance;
     }
 
     public String getName() //returns the name of the horse
+
     {
         return this.horseName;
     }
 
     public char getSymbol() //returns the symbol of the horse
+
     {
         return this.horseSymbol;
     }
 
     public void goBackToStart() //set the horses back to the start line
+
     {
         this.horseDistance = 0;
         this.hasFallen = false;
     }
 
     public boolean hasFallen()// returns wether the horse has fallen or not
+
     {
        return this.hasFallen;
     }
 
+
     public void moveForward() //moves the horse forward by 1 index;
+
     {
         this.horseDistance++;
     }
     
+
     public void setConfidence(double newConfidence) //asigns a new confident to the horse
+
     {
         if(newConfidence >= 0 && newConfidence <=1)
         {
@@ -346,7 +360,9 @@ class Horse
         }
         else
         {
+
             throw new IllegalArgumentException("Confidence must be between 0 and 1"); //incase the inputed confidence is out of bounds
+
         }
     }
 
@@ -365,6 +381,7 @@ class Horse
  */
 class Race
 {
+
     private int trackLength;
     private int laneCount;
     private String trackShape;
@@ -375,6 +392,7 @@ class Race
     private Horse lane4Horse;
     private Horse lane5Horse;
     private static ArrayList<Horse> numberOfHorses = new ArrayList<Horse>();
+
 
     /**
      * Constructor for objects of class Race
@@ -394,7 +412,6 @@ class Race
         lane3Horse = null;
         lane4Horse = null;
         lane5Horse = null;
-
     }
     
     /**
@@ -417,6 +434,7 @@ class Race
         {
             lane3Horse = theHorse;
         }
+
         else if (laneNumber == 4)
         {
             lane4Horse = theHorse;
@@ -446,6 +464,7 @@ class Race
         boolean finished = false;
         
         //reset all the lanes (all horses not fallen and back to 0). 
+
         for (int i = 0; i<laneCount; i++) 
         {
             numberOfHorses.get(i).goBackToStart();
@@ -457,6 +476,7 @@ class Race
             printRace();
             
             //if any of the three horses has won the race is finished
+
             if ( raceWonBy(lane1Horse) || raceWonBy(lane2Horse) || raceWonBy(lane3Horse) || raceWonBy(lane4Horse) || raceWonBy(lane5Horse))
             {
                 finished = true;
@@ -511,7 +531,9 @@ class Race
      */
     private boolean raceWonBy(Horse theHorse)
     {
+
         if (theHorse.getDistanceTravelled() >= trackLength)
+
         {
             System.err.println("And the winner is... " + theHorse.getName());
             return true;
@@ -530,6 +552,7 @@ class Race
         System.out.print("\033[H\033[2J");
         System.out.flush();
 
+
         multiplePrint('=',trackLength+3); //top edge of track
         System.out.println();
         
@@ -540,6 +563,7 @@ class Race
         }
         
         multiplePrint('=',trackLength+3); //bottom edge of track
+
         System.out.println();    
     }
     
@@ -554,7 +578,9 @@ class Race
         //calculate how many spaces are needed before
         //and after the horse
         int spacesBefore = theHorse.getDistanceTravelled();
+
         int spacesAfter = trackLength - theHorse.getDistanceTravelled();
+
         
         //print a | for the beginning of the lane
         System.out.print('|');
@@ -596,6 +622,7 @@ class Race
             i = i + 1;
         }
     }
+
     //returns the length of the track
     public int getTrackLength() 
     {
@@ -616,3 +643,4 @@ class HorseRaceSimulationGUI
         newRace.setVisible(true);
     }
 }
+
